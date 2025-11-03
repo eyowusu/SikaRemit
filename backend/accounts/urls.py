@@ -1,0 +1,140 @@
+from django.urls import path, include
+from rest_framework.routers import DefaultRouter
+from rest_framework_simplejwt.views import (
+    TokenObtainPairView,
+    TokenRefreshView,
+)
+from django.views.decorators.csrf import csrf_exempt
+from .views import (
+    UserRegisterView, 
+    UserLoginView, 
+    UserRefreshView, 
+    UserLogoutView,
+    GoogleAuthView,
+    MFASetupView,
+    MFALoginView,
+    MFABackupCodesView,
+    PasswordResetView,
+    PasswordResetConfirmView,
+    PasswordPolicyView,
+    AdminActivityView,
+    SecurityAuditView,
+    BackupVerificationView,
+    SessionListView,
+    BackupVerificationListView,
+    AuditReportView,
+    LogoutOtherSessionsView,
+    SessionAnalyticsView,
+    ConcurrentSessionCheckView,
+    SessionTestView,
+    PasswordResetTokenViewSet,
+    AuthLogViewSet,
+    TransactionViewSet,
+    MerchantProductViewSet,
+    ProductInventoryView,
+    SubscriptionPaymentView,
+    LoyaltyPointsView,
+    RedeemPointsView,
+    RemittancePaymentView,
+    BillPaymentView,
+    CheckoutAPIView,
+    CheckoutStatusView,
+    StripeWebhookView,
+    PayPalWebhookView,
+    MobileMoneyWebhookView,
+    AdminUserViewSet,
+    UserViewSet,
+    PaymentLogViewSet,
+    CustomerViewSet,
+    MerchantViewSet,
+    TokenValidateView
+)
+from .api.views import (
+    UserBulkAPIView,
+    VerificationBulkAPIView,
+    ExportAPIView,
+    UserSearchAPIView,
+    ImpersonateAPIView,
+    StopImpersonationAPIView,
+    MerchantMetricsAPIView,
+    MerchantVerificationAPIView,
+    AdminUserSearchView,
+    AdminUserBulkUpdateView,
+    AdminUserDetailView,
+    AdminVerificationListView,
+    AdminVerificationActionView,
+    AdminExportView
+)
+from .api.payouts import MerchantPayoutsAPIView, ProcessPayoutAPIView
+from .api.notifications import NotificationAPIView
+
+router = DefaultRouter()
+router.register(r'password-reset-tokens', PasswordResetTokenViewSet)
+router.register(r'auth-logs', AuthLogViewSet)
+router.register(r'transactions', TransactionViewSet, basename='transaction')
+router.register(r'merchant-products', MerchantProductViewSet, basename='merchant-product')
+router.register(r'admin/users', AdminUserViewSet, basename='admin-users')
+router.register(r'users', UserViewSet)
+router.register(r'payment-logs', PaymentLogViewSet)
+router.register(r'customers', CustomerViewSet)
+router.register(r'merchants', MerchantViewSet)
+
+urlpatterns = [
+    path('register/', csrf_exempt(UserRegisterView.as_view()), name='register'),
+    path('login/', UserLoginView.as_view(), name='login'),
+    path('refresh/', UserRefreshView.as_view(), name='refresh'),
+    path('logout/', UserLogoutView.as_view(), name='logout'),
+    path('google/', csrf_exempt(GoogleAuthView.as_view()), name='google-auth'),
+    path('mfa/setup/', csrf_exempt(MFASetupView.as_view()), name='mfa-setup'),
+    path('mfa/verify/', csrf_exempt(MFALoginView.as_view()), name='mfa-verify'),
+    path('mfa/backup-codes/', csrf_exempt(MFABackupCodesView.as_view()), name='mfa-backup-codes'),
+    path('password-reset/', csrf_exempt(PasswordResetView.as_view()), name='password-reset'),
+    path('password-reset/confirm/', csrf_exempt(PasswordResetConfirmView.as_view()), name='password-reset-confirm'),
+    path('password-policy/', csrf_exempt(PasswordPolicyView.as_view()), name='password-policy'),
+    path('admin-activity/', csrf_exempt(AdminActivityView.as_view()), name='admin-activity'),
+    path('security-audit/', csrf_exempt(SecurityAuditView.as_view()), name='security-audit'),
+    path('backup-verification/', csrf_exempt(BackupVerificationView.as_view()), name='backup-verification'),
+    path('backup-verifications/', csrf_exempt(BackupVerificationListView.as_view()), name='backup-verification-list'),
+    path('audit-reports/', csrf_exempt(AuditReportView.as_view()), name='audit-reports'),
+    path('sessions/', csrf_exempt(SessionListView.as_view()), name='session-list'),
+    path('sessions/logout-others/', csrf_exempt(LogoutOtherSessionsView.as_view()), name='logout-other-sessions'),
+    path('sessions/analytics/', csrf_exempt(SessionAnalyticsView.as_view()), name='session-analytics'),
+    path('sessions/concurrent-check/', csrf_exempt(ConcurrentSessionCheckView.as_view()), name='concurrent-session-check'),
+    path('session-test/', csrf_exempt(SessionTestView.as_view()), name='session-test'),
+    path('merchant-products/inventory/', ProductInventoryView.as_view(), name='product-inventory'),
+    path('subscriptions/upgrade/', SubscriptionPaymentView.as_view(), name='subscription-upgrade'),
+    path('payments/remittance/', RemittancePaymentView.as_view(), name='remittance-payment'),
+    path('payments/bill/', BillPaymentView.as_view(), name='bill-payment'),
+    path('webhooks/stripe/', StripeWebhookView.as_view(), name='stripe-webhook'),
+    path('webhooks/paypal/', PayPalWebhookView.as_view(), name='paypal-webhook'),
+    path('webhooks/mobile-money/', MobileMoneyWebhookView.as_view(), name='mobile-money-webhook'),
+    path('customer/loyalty/', LoyaltyPointsView.as_view(), name='customer-loyalty'),
+    path('customer/loyalty/redeem/', RedeemPointsView.as_view(), name='redeem-points'),
+    path('token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    path('token/validate/', TokenValidateView.as_view(), name='token-validate'),
+    path('users/bulk/', UserBulkAPIView.as_view(), name='user-bulk-actions'),
+    path('verifications/bulk/', VerificationBulkAPIView.as_view(), name='verification-bulk-actions'),
+    path('export/', ExportAPIView.as_view(), name='export-actions'),
+    path('notifications/', NotificationAPIView.as_view(), name='notifications'),
+    path('notifications/<int:pk>/', NotificationAPIView.as_view(), name='notification-detail'),
+    path('search/', UserSearchAPIView.as_view(), name='user-search'),
+    path('impersonate/<int:user_id>/', ImpersonateAPIView.as_view(), name='impersonate-user'),
+    path('stop-impersonating/', StopImpersonationAPIView.as_view(), name='stop-impersonating'),
+    path('payouts/', MerchantPayoutsAPIView.as_view(), name='merchant-payouts'),
+    path('payouts/process/<int:payout_id>/', ProcessPayoutAPIView.as_view(), name='process-payout'),
+    path('merchants/', include([
+        path('metrics/', MerchantMetricsAPIView.as_view(), name='merchant-metrics'),
+        path('verify/<int:merchant_id>/', MerchantVerificationAPIView.as_view(), name='verify-merchant'),
+        path('payouts/', MerchantPayoutsAPIView.as_view(), name='merchant-payouts'),
+        path('new-path/', MerchantMetricsAPIView.as_view(), name='new-merchant-path'),
+    ])),
+    path('admin/users/search/', AdminUserSearchView.as_view(), name='admin-users-search'),
+    path('admin/users/bulk/', AdminUserBulkUpdateView.as_view(), name='admin-users-bulk'),
+    path('admin/users/<int:user_id>/', AdminUserDetailView.as_view(), name='admin-user-detail'),
+    path('admin/verifications/pending/', AdminVerificationListView.as_view(), name='admin-verifications-pending'),
+    path('admin/verifications/<int:verification_id>/<str:action>/', AdminVerificationActionView.as_view(), name='admin-verification-action'),
+    path('admin/export/', AdminExportView.as_view(), name='admin-export'),
+    path('checkout/', CheckoutAPIView.as_view(), name='checkout'),
+    path('checkout/<uuid:pk>/status/', CheckoutStatusView.as_view(), name='checkout-status'),
+    path('', include(router.urls)),

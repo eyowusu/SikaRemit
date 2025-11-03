@@ -1,0 +1,66 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 224 71.4% 4.1%;
+    --card: 0 0% 100%;
+    --card-foreground: 224 71.4% 4.1%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 224 71.4% 4.1%;
+    --primary: 262.1 83.3% 57.8%;
+    --primary-foreground: 210 20% 98%;
+    --secondary: 220 14.3% 95.9%;
+    --secondary-foreground: 220.9 39.3% 11%;
+    --muted: 220 14.3% 95.9%;
+    --muted-foreground: 220 8.9% 46.1%;
+    --accent: 220 14.3% 95.9%;
+    --accent-foreground: 220.9 39.3% 11%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 20% 98%;
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 262.1 83.3% 57.8%;
+    --radius: 0.5rem;
+  }
+
+  * {
+    border-color: hsl(var(--border));
+  }
+
+  body {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+  }
+}
+
+@layer utilities {
+  /* Force modern colors to be applied */
+  .bg-payglobe-primary {
+    background-color: #8b5cf6 !important; /* Purple */
+  }
+
+  .text-payglobe-primary {
+    color: #8b5cf6 !important; /* Purple */
+  }
+
+  .bg-payglobe-card {
+    background-color: #ffffff !important; /* White */
+  }
+
+  .text-payglobe-foreground {
+    color: #1f2937 !important; /* Dark gray */
+  }
+
+  .bg-payglobe-accent {
+    background-color: #f3f4f6 !important; /* Light gray */
+  }
+
+  .text-payglobe-muted {
+    color: #6b7280 !important; /* Medium gray */
+  }
+
+  .border-payglobe-border {
+    border-color: #e5e7eb !important; /* Light border */
+  }
+}

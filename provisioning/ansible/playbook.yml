@@ -1,0 +1,30 @@
+---
+- name: Configure PayGlobe Monitoring
+  hosts: all
+  vars:
+    backup_dir: /opt/payglobe/config_backups
+  tasks:
+    - name: Ensure backup directory exists
+      file:
+        path: "{{ backup_dir }}"
+        state: directory
+        mode: '0755'
+
+    - name: Install monitoring requirements
+      pip:
+        name:
+          - prometheus-client
+          - requests
+
+    - name: Deploy backup scripts
+      copy:
+        src: "../../scripts/"
+        dest: "/opt/payglobe/scripts"
+        mode: '0755'
+
+    - name: Schedule backups
+      cron:
+        name: "PayGlobe config backup"
+        minute: "0"
+        hour: "2"
+        job: "cd /opt/payglobe && ./scripts/backup_config.sh"

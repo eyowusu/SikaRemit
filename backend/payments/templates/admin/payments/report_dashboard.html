@@ -1,0 +1,125 @@
+{% extends "admin/change_list.html" %}
+{% load static %}
+
+{% block content %}
+<div id="report-dashboard">
+    {{ block.super }}
+    <div class="chart-container">
+        <h2>Monthly Remittance Trends</h2>
+        <div id="trend-chart" style="width: 100%; height: 400px;"></div>
+    </div>
+    
+    <div class="chart-row">
+        <div class="chart-container">
+            <h2>Bill Type Distribution</h2>
+            <div id="type-chart" style="width: 100%; height: 300px;"></div>
+        </div>
+        
+        <div class="chart-container">
+            <h2>Status Ratios</h2>
+            <div id="status-chart" style="width: 100%; height: 300px;"></div>
+        </div>
+    </div>
+</div>
+
+<script src="{% static 'admin/js/vendor/chartjs/chart.min.js' %}"></script>
+<script>
+(function() {
+    document.addEventListener('DOMContentLoaded', function() {
+        // Initialize charts with data from context
+        const data = JSON.parse('{{ visualization_data|escapejs }}');
+        
+        // Trend chart (Line)
+        new Chart(
+            document.getElementById('trend-chart'),
+            {
+                type: 'line',
+                data: {
+                    labels: data.monthly_trends.map(function(item) {
+                        return `${item.year}-${item.month}`;
+                    }),
+                    datasets: [{
+                        label: 'Remittance Amount',
+                        data: data.monthly_trends.map(function(item) {
+                            return item.total;
+                        }),
+                        borderColor: 'rgb(75, 192, 192)',
+                        tension: 0.1
+                    }]
+                }
+            }
+        );
+        
+        // Type chart (Doughnut)
+        new Chart(
+            document.getElementById('type-chart'),
+            {
+                type: 'doughnut',
+                data: {
+                    labels: data.type_distribution.map(function(item) {
+                        return item.bill_type;
+                    }),
+                    datasets: [{
+                        data: data.type_distribution.map(function(item) {
+                            return item.total;
+                        }),
+                        backgroundColor: [
+                            'rgb(255, 99, 132)',
+                            'rgb(54, 162, 235)',
+                            'rgb(255, 205, 86)',
+                            'rgb(75, 192, 192)'
+                        ]
+                    }]
+                }
+            }
+        );
+        
+        // Status chart (Pie)
+        new Chart(
+            document.getElementById('status-chart'),
+            {
+                type: 'pie',
+                data: {
+                    labels: data.status_ratios.map(function(item) {
+                        return item.status;
+                    }),
+                    datasets: [{
+                        data: data.status_ratios.map(function(item) {
+                            return item.count;
+                        }),
+                        backgroundColor: [
+                            'rgb(255, 99, 132)',
+                            'rgb(54, 162, 235)',
+                            'rgb(255, 205, 86)'
+                        ]
+                    }]
+                }
+            }
+        );
+    });
+})();
+</script>
+
+{% endblock %}
+
+{% block extrahead %}
+{{ block.super }}
+<style>
+.chart-container {
+    margin-bottom: 2rem;
+    padding: 1rem;
+    background: white;
+    border-radius: 4px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+}
+
+.chart-row {
+    display: flex;
+    gap: 1rem;
+}
+
+.chart-row .chart-container {
+    flex: 1;
+}
+</style>
+{% endblock %}

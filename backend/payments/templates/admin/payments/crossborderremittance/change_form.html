@@ -1,0 +1,30 @@
+{% extends "admin/change_form.html" %}
+{% load i18n admin_urls static admin_modify %}
+
+{% block extrahead %}
+{{ block.super }}
+<script src="{% static 'admin/js/exemption_workflow.js' %}"></script>
+{% endblock %}
+
+{% block after_field_sets %}
+{% if original and original.exemption_status %}
+<fieldset class="module aligned">
+    <h2>Exemption Status</h2>
+    <div class="form-row">
+        <div>
+            <label>Current Status:</label>
+            <strong>{{ original.get_exemption_status_display }}</strong>
+        </div>
+    </div>
+    {% if original.exemption_notes %}
+    <div class="form-row">
+        <div>
+            <label>Notes:</label>
+            {{ original.exemption_notes }}
+        </div>
+    </div>
+    {% endif %}
+</fieldset>
+{% endif %}
+{{ block.super }}
+{% endblock %}
