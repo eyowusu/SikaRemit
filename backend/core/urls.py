@@ -38,6 +38,9 @@ urlpatterns = [
     path('api/v1/kyc/', include('kyc.urls')),
     path('api/v1/invoices/', include('invoice.urls')),
     
+    # Health Check for API v1 (for Render health checks)
+    path('api/v1/health/', HealthCheckView.as_view(), name='api-health-check'),
+    
     # Payments API v1
     path('api/v1/payments/', include('payments.urls')),
     
