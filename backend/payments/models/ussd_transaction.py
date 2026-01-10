@@ -1,6 +1,6 @@
 from django.db import models
 
-class USSDTransaction(models.Model):
+class SimpleUSSDTransaction(models.Model):
     """Track USSD payment sessions and state"""
     NEW = 'new'
     AMOUNT_ENTERED = 'amount_entered'

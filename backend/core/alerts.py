@@ -24,8 +24,8 @@ ALERT_THRESHOLDS = {
 }
 
 NOTIFICATION_CHANNELS = [
-    'admin@payglobe.com',
-    'devops@payglobe.com'  # Added secondary channel
+    'admin@SikaRemit.com',
+    'devops@SikaRemit.com'  # Added secondary channel
 ]
 
 ALERT_COOLDOWN = 300  # 5 minutes between repeat alerts
@@ -57,7 +57,7 @@ def send_to_slack(message):
     if SLACK_WEBHOOK:
         requests.post(
             SLACK_WEBHOOK,
-            json={'text': f"[PayGlobe Alert] {message}"}
+            json={'text': f"[SikaRemit Alert] {message}"}
         )
 
 def send_to_grafana(alert):
@@ -74,9 +74,9 @@ def send_to_grafana(alert):
 def send_alerts(alerts):
     # Email
     send_mail(
-        f"PayGlobe Alert: {', '.join([a[0] for a in alerts])}",
+        f"SikaRemit Alert: {', '.join([a[0] for a in alerts])}",
         '\n\n'.join([f"{a[0]}: {a[1]}" for a in alerts]),
-        'alerts@payglobe.com',
+        'alerts@SikaRemit.com',
         NOTIFICATION_CHANNELS
     )
     

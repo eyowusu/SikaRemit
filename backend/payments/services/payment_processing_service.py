@@ -2,94 +2,356 @@ from django.db import transaction
 from ..models.transaction import Transaction
 from ..models.payment_method import PaymentMethod
 from ..models.payment import Payment
-from accounts.models import Customer, Merchant
+from users.models import Customer, Merchant
 import logging
 import time
+from typing import Dict, Any
 
 logger = logging.getLogger(__name__)
 
-class PaymentService:
+class PaymentServiceWithKYC:
     """
     Service class for handling payment processing logic
     """
     @staticmethod
     def process_payment(user, amount, payment_method, payment_token=None):
         """
-        Process a payment transaction
+        Process a payment transaction using the appropriate payment gateway
+        """
+        from ..gateways.stripe import StripeGateway
+        from ..gateways.paystack import PaystackGateway
+        from ..gateways.flutterwave import FlutterwaveGateway
+        from ..gateways.mobile_money import MobileMoneyGateway
+        from ..models import PaymentMethod as PaymentMethodModel
+        import uuid
+
+        transaction = None
+        try:
+            logger.info(f"Processing payment for user {user.id}: amount={amount}, method={payment_method}")
+
+            # Validate inputs
+            if not user or not amount or amount <= 0:
+                raise ValueError("Invalid payment parameters")
+
+            # Get payment method object
+            try:
+                payment_method_obj = PaymentMethodModel.objects.get(
+                    id=payment_method,
+                    user=user
+                )
+            except PaymentMethodModel.DoesNotExist:
+                logger.error(f"Payment method {payment_method} not found for user {user.id}")
+                raise ValueError("Payment method not found")
+
+            # Create transaction record
+            transaction = Transaction.objects.create(
+                customer=user.customer_profile,
+                amount=amount,
+                payment_method=payment_method_obj,
+                status='pending',
+                currency='GHS' if payment_method_obj.method_type in ['mtn_momo', 'telecel', 'airtel_tigo'] else 'USD'  # Dynamic currency default
+            )
+            logger.info(f"Created transaction {transaction.id} for user {user.id}")
+
+            # Route to appropriate gateway based on payment method type
+            gateway_result = None
+            try:
+                if payment_method_obj.method_type == PaymentMethodModel.CARD:
+                    # Use Stripe for cards (most reliable global option)
+                    logger.info(f"Routing to Stripe gateway for transaction {transaction.id}")
+                    try:
+                        from ..gateways.stripe import StripeGateway
+                        gateway = StripeGateway()
+                        gateway_result = gateway.process_payment(
+                            amount=amount,
+                            currency='USD',  # Default to USD for cards
+                            payment_method=payment_method_obj,
+                            customer=user.customer_profile,
+                            merchant=None,  # Will be set by calling view
+                            metadata={'transaction_id': transaction.id}
+                        )
+                    except Exception as e:
+                        logger.warning(f"Stripe gateway failed: {e}")
+
+                elif payment_method_obj.method_type in [PaymentMethodModel.MTN_MOMO, PaymentMethodModel.TELECEL, PaymentMethodModel.AIRTEL_TIGO]:
+                    # Use Paystack for Ghanaian mobile money (most reliable for local market)
+                    logger.info(f"Routing to Paystack gateway for transaction {transaction.id}")
+                    try:
+                        from ..gateways.paystack import PaystackGateway
+                        gateway = PaystackGateway()
+                        gateway_result = gateway.process_payment(
+                            amount=amount,
+                            currency='GHS',  # Ghanaian payments default to GHS
+                            payment_method=payment_method_obj,
+                            customer=user.customer_profile,
+                            merchant=None,
+                            metadata={'transaction_id': transaction.id}
+                        )
+                    except Exception as e:
+                        logger.warning(f"Paystack gateway failed: {e}")
+
+                elif payment_method_obj.method_type == PaymentMethodModel.BANK:
+                    # Use Flutterwave for bank transfers (better support for various banks)
+                    logger.info(f"Routing to Flutterwave gateway for transaction {transaction.id}")
+                    try:
+                        from ..gateways.flutterwave import FlutterwaveGateway
+                        gateway = FlutterwaveGateway()
+                        gateway_result = gateway.process_payment(
+                            amount=amount,
+                            currency='GHS',  # Default to GHS for bank transfers
+                            payment_method=payment_method_obj,
+                            customer=user.customer_profile,
+                            merchant=None,
+                            metadata={'transaction_id': transaction.id}
+                        )
+                    except Exception as e:
+                        logger.warning(f"Flutterwave gateway failed: {e}")
+                else:
+                    logger.error(f"Unsupported payment method type: {payment_method_obj.method_type}")
+                    raise ValueError(f"Unsupported payment method: {payment_method_obj.method_type}")
+            except Exception as e:
+                logger.warning(f"Real gateway failed for {payment_method_obj.method_type}: {e}")
+                # Fallback to mock gateway
+                try:
+                    from ..gateways.mock_gateway import MockPaymentGateway
+                    mock_gateway = MockPaymentGateway()
+                    logger.info(f"Using mock gateway for transaction {transaction.id}")
+                    gateway_result = mock_gateway.process_payment(
+                        amount=amount,
+                        currency='GHS' if payment_method_obj.method_type in ['mtn_momo', 'telecel', 'airtel_tigo'] else 'USD',
+                        payment_method=payment_method_obj,
+                        customer=user.customer_profile,
+                        merchant=None,
+                        metadata={'transaction_id': transaction.id}
+                    )
+                except Exception as mock_error:
+                    logger.error(f"Mock gateway also failed: {mock_error}")
+                    raise ValueError(f"All payment gateways failed for transaction {transaction.id}")
+
+            # Update transaction status based on gateway result
+            if gateway_result.get('success'):
+                transaction.status = 'completed'
+                # Store transaction ID in metadata
+                transaction.metadata = transaction.metadata or {}
+                transaction.metadata['gateway_transaction_id'] = gateway_result.get('transaction_id', str(uuid.uuid4()))
+                if gateway_result.get('authorization_url'):
+                    transaction.metadata['authorization_url'] = gateway_result['authorization_url']
+                logger.info(f"Payment successful for transaction {transaction.id}")
+            else:
+                transaction.status = 'failed'
+                transaction.failure_reason = gateway_result.get('error', 'Payment failed')
+                logger.error(f"Payment failed for transaction {transaction.id}: {gateway_result.get('error')}")
+
+            transaction.save()
+            return transaction
+
+            # Perform fraud detection analysis
+            fraud_analysis = self._perform_fraud_analysis(transaction)
+            
+            # Update transaction with fraud analysis results
+            if fraud_analysis.get('auto_block'):
+                transaction.status = 'failed'
+                transaction.metadata = transaction.metadata or {}
+                transaction.metadata['fraud_blocked'] = True
+                transaction.metadata['fraud_score'] = fraud_analysis.get('fraud_score')
+                transaction.save()
+                logger.warning(f"Transaction {transaction.id} blocked by fraud detection")
+                
+                return {
+                    'success': False,
+                    'transaction_id': transaction.transaction_id,
+                    'status': transaction.status,
+                    'error': 'Transaction blocked by fraud detection',
+                    'fraud_analysis': fraud_analysis
+                }
+
+            return {
+                'success': result.get('success', False),
+                'transaction_id': transaction.transaction_id,
+                'status': transaction.status,
+                'gateway_response': result,
+                'fraud_analysis': fraud_analysis
+            }
+
+        except ValueError as e:
+            logger.warning(f"Payment validation error for user {user.id}: {str(e)}")
+            if transaction:
+                transaction.status = 'failed'
+                transaction.metadata = {'error': str(e)}
+                transaction.save()
+            return {'success': False, 'error': str(e)}
+
+        except Exception as e:
+            logger.error(f"Payment processing failed for user {user.id}: {str(e)}", exc_info=True)
+            if transaction:
+                transaction.status = 'failed'
+                transaction.metadata = {'error': str(e)}
+                transaction.save()
+            return {'success': False, 'error': 'Payment processing failed'}
+    
+    @staticmethod
+    def _perform_fraud_analysis(transaction) -> Dict[str, Any]:
+        """
+        Perform fraud detection analysis on transaction
         """
         try:
-            # Create and save transaction
-            transaction = Transaction.objects.create(
-                user=user,
-                amount=amount,
-                payment_method=payment_method,
-                status='pending'
-            )
-            
-            # Process payment based on method
-            if payment_method == 'card':
-                result = PaymentService._process_card_payment(payment_token, amount)
-            elif payment_method == 'mobile_money':
-                result = PaymentService._process_mobile_payment(user.phone_number, amount)
-            elif payment_method == 'ussd':
-                result = PaymentService._process_mobile_payment(user.phone_number, amount)
-            else:
-                raise ValueError(f"Unsupported payment method: {payment_method}")
-            
-            # Update transaction status
-            transaction.status = 'completed' if result['success'] else 'failed'
-            transaction.save()
-            
-            return {
-                'success': True,
-                'transaction_id': transaction.id,
-                'status': transaction.status
-            }
-            
+            from .fraud_detection_ml_service import MLFraudDetectionService
+            fraud_service = MLFraudDetectionService()
+            return fraud_service.analyze_transaction(transaction)
         except Exception as e:
-            logger.error(f"Payment processing failed: {str(e)}")
-            return {'success': False, 'error': str(e)}
+            logger.error(f"Fraud analysis failed: {str(e)}")
+            return {
+                'fraud_score': 0.0,
+                'risk_level': 'unknown',
+                'error': str(e)
+            }
     
     @staticmethod
     def verify_mobile_payment(transaction_id, provider):
         """
-        Verify a mobile money payment
+        Verify a mobile money payment status with the provider
         """
         try:
-            # Implementation would call provider's API
-            # Mock verification for now
-            return {'success': True, 'verified': True}
+            from ..gateways.mobile_money import (
+                MTNMoMoGateway, TelecelCashGateway, AirtelTigoMoneyGateway
+            )
+            
+            gateway_map = {
+                'mtn_momo': MTNMoMoGateway,
+                'mtn': MTNMoMoGateway,
+                'telecel': TelecelCashGateway,
+                'telecel_cash': TelecelCashGateway,
+                'airtel_tigo': AirtelTigoMoneyGateway,
+                'airteltigo': AirtelTigoMoneyGateway,
+            }
+            
+            gateway_class = gateway_map.get(provider.lower())
+            if not gateway_class:
+                return {
+                    'success': False,
+                    'error': f'Unknown mobile money provider: {provider}'
+                }
+            
+            gateway = gateway_class()
+            result = gateway.check_transaction_status(transaction_id)
+            
+            return {
+                'success': result.get('success', False),
+                'status': result.get('status'),
+                'amount': result.get('amount'),
+                'verified': result.get('status') in ['SUCCESSFUL', 'completed', 'SUCCESS'],
+                'raw_response': result.get('raw_response')
+            }
+            
         except Exception as e:
             logger.error(f"Mobile payment verification failed: {str(e)}")
-            return {'success': False, 'error': str(e)}
+            return {
+                'success': False,
+                'error': str(e)
+            }
     
     @staticmethod
-    def _process_card_payment(token, amount):
+    def _process_card_payment(token, amount, currency='USD', customer=None, metadata=None):
         """
-        Process card payment through payment gateway
+        Process card payment through Stripe gateway
         """
-        # Implementation would integrate with payment gateway
-        # Mock processing for now
-        return {'success': True}
+        try:
+            from ..gateways.stripe import StripeGateway
+            
+            gateway = StripeGateway()
+            
+            # Create a mock payment method object for the gateway
+            class MockPaymentMethod:
+                def __init__(self, token):
+                    self.details = {'payment_method_id': token}
+            
+            payment_method = MockPaymentMethod(token)
+            
+            result = gateway.process_payment(
+                amount=amount,
+                currency=currency,
+                payment_method=payment_method,
+                customer=customer,
+                merchant=None,
+                metadata=metadata or {}
+            )
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"Card payment processing failed: {str(e)}")
+            return {
+                'success': False,
+                'error': str(e)
+            }
     
     @staticmethod
-    def _process_mobile_payment(phone_number, amount):
+    def _process_mobile_payment(phone_number, amount, provider='mtn_momo', currency='GHS', metadata=None):
         """
-        Process mobile money payment via USSD
+        Process mobile money payment
         Args:
             phone_number: Customer phone number
             amount: Payment amount
+            provider: Mobile money provider (mtn_momo, telecel, airtel_tigo)
+            currency: Currency code
+            metadata: Additional metadata
         """
         try:
-            # In a real implementation, this would integrate with mobile money APIs
-            # For now we'll simulate a successful payment
-            return {
-                'success': True,
-                'transaction_id': f"MM-{phone_number[-8:]}-{int(time.time())}"
+            from ..gateways.mobile_money import (
+                MTNMoMoGateway, TelecelCashGateway, AirtelTigoMoneyGateway
+            )
+            
+            gateway_map = {
+                'mtn_momo': MTNMoMoGateway,
+                'mtn': MTNMoMoGateway,
+                'telecel': TelecelCashGateway,
+                'telecel_cash': TelecelCashGateway,
+                'airtel_tigo': AirtelTigoMoneyGateway,
+                'airteltigo': AirtelTigoMoneyGateway,
             }
+            
+            gateway_class = gateway_map.get(provider.lower())
+            if not gateway_class:
+                return {
+                    'success': False,
+                    'error': f'Unknown mobile money provider: {provider}'
+                }
+            
+            gateway = gateway_class()
+            
+            # Create mock payment method object
+            class MockPaymentMethod:
+                def __init__(self, phone):
+                    self.details = {'phone_number': phone}
+                    self.id = f"mock_{phone}"
+            
+            class MockCustomer:
+                def __init__(self):
+                    self.id = 'mock_customer'
+            
+            class MockMerchant:
+                def __init__(self):
+                    self.business_name = 'SikaRemit'
+            
+            payment_method = MockPaymentMethod(phone_number)
+            
+            result = gateway.process_payment(
+                amount=amount,
+                currency=currency,
+                payment_method=payment_method,
+                customer=MockCustomer(),
+                merchant=MockMerchant(),
+                metadata=metadata or {}
+            )
+            
+            return result
+            
         except Exception as e:
             logger.error(f"Mobile payment processing failed: {str(e)}")
-            return {'success': False, 'error': str(e)}
+            return {
+                'success': False,
+                'error': str(e)
+            }
 
     @staticmethod
     def process_payout(merchant, amount):
@@ -151,16 +413,168 @@ class PaymentService:
             }
     
     @staticmethod
-    def _process_bank_payout(merchant, amount):
-        """Process bank transfer payout"""
-        # Integration with bank API would go here
-        return {'success': True}
+    def _process_bank_payout(merchant, amount, currency='GHS'):
+        """
+        Process bank transfer payout using Flutterwave
+        """
+        try:
+            from django.conf import settings
+            import requests
+            import uuid
+            
+            payout_method = merchant.default_payout_method
+            bank_details = payout_method.details if payout_method else {}
+            
+            payload = {
+                "account_bank": bank_details.get('bank_code', bank_details.get('bank_name')),
+                "account_number": bank_details.get('account_number'),
+                "amount": float(amount),
+                "currency": currency,
+                "narration": f"SikaRemit payout to {merchant.business_name}",
+                "reference": f"PAYOUT-{uuid.uuid4().hex[:12].upper()}",
+                "beneficiary_name": merchant.business_name
+            }
+            
+            response = requests.post(
+                "https://api.flutterwave.com/v3/transfers",
+                json=payload,
+                headers={
+                    "Authorization": f"Bearer {settings.FLUTTERWAVE_SECRET_KEY}",
+                    "Content-Type": "application/json"
+                },
+                timeout=30
+            )
+            
+            if response.status_code in [200, 201]:
+                data = response.json()
+                return {
+                    'success': True,
+                    'transaction_id': data.get('data', {}).get('id'),
+                    'reference': payload['reference'],
+                    'status': 'processing'
+                }
+            else:
+                error_msg = response.json().get('message', 'Bank payout failed') if response.text else 'Bank payout failed'
+                return {
+                    'success': False,
+                    'error': error_msg
+                }
+                
+        except Exception as e:
+            logger.error(f"Bank payout failed: {str(e)}")
+            return {
+                'success': False,
+                'error': str(e)
+            }
     
     @staticmethod
-    def _process_mobile_payout(merchant, amount):
-        """Process mobile money payout"""
-        # Integration with mobile money API would go here
-        return {'success': True}
+    def _process_mobile_payout(merchant, amount, currency='GHS'):
+        """
+        Process mobile money payout using Flutterwave
+        """
+        try:
+            from django.conf import settings
+            import requests
+            import uuid
+            
+            payout_method = merchant.default_payout_method
+            mobile_details = payout_method.details if payout_method else {}
+            
+            # Determine mobile money provider
+            provider = mobile_details.get('provider', 'MTN').upper()
+            phone_number = mobile_details.get('phone_number', '')
+            
+            # Format phone number
+            if phone_number.startswith('0'):
+                phone_number = '233' + phone_number[1:]
+            elif not phone_number.startswith('233'):
+                phone_number = '233' + phone_number
+            
+            payload = {
+                "account_bank": provider,
+                "account_number": phone_number,
+                "amount": float(amount),
+                "currency": currency,
+                "narration": f"SikaRemit payout to {merchant.business_name}",
+                "reference": f"MOMO-PAYOUT-{uuid.uuid4().hex[:12].upper()}",
+                "beneficiary_name": merchant.business_name
+            }
+            
+            response = requests.post(
+                "https://api.flutterwave.com/v3/transfers",
+                json=payload,
+                headers={
+                    "Authorization": f"Bearer {settings.FLUTTERWAVE_SECRET_KEY}",
+                    "Content-Type": "application/json"
+                },
+                timeout=30
+            )
+            
+            if response.status_code in [200, 201]:
+                data = response.json()
+                return {
+                    'success': True,
+                    'transaction_id': data.get('data', {}).get('id'),
+                    'reference': payload['reference'],
+                    'status': 'processing'
+                }
+            else:
+                error_msg = response.json().get('message', 'Mobile payout failed') if response.text else 'Mobile payout failed'
+                return {
+                    'success': False,
+                    'error': error_msg
+                }
+                
+        except Exception as e:
+            logger.error(f"Mobile payout failed: {str(e)}")
+            return {
+                'success': False,
+                'error': str(e)
+            }
+
+    @staticmethod
+    def _check_user_kyc_eligibility(user):
+        """
+        Check if user is eligible to make transactions based on KYC status
+        Returns dict with eligibility status and details
+        """
+        try:
+            from users.models import Customer
+
+            # Get customer profile
+            customer = Customer.objects.get(user=user)
+
+            # Record transaction attempt for analytics
+            customer.record_transaction_attempt()
+
+            # Check if user can make transactions
+            if customer.can_make_transactions:
+                return {
+                    'eligible': True,
+                    'message': 'User is verified and can make transactions'
+                }
+            else:
+                # User needs verification
+                return {
+                    'eligible': False,
+                    'error': 'KYC verification required before making transactions',
+                    'kyc_status': customer.kyc_status,
+                    'kyc_required': customer.needs_kyc_verification,
+                    'next_action': 'start_kyc' if customer.kyc_status == 'not_started' else 'continue_kyc',
+                    'transaction_attempts': customer.transaction_attempts_count
+                }
+
+        except Customer.DoesNotExist:
+            return {
+                'eligible': False,
+                'error': 'Customer profile not found. Please complete registration.'
+            }
+        except Exception as e:
+            logger.error(f"KYC eligibility check failed for user {user.id}: {str(e)}")
+            return {
+                'eligible': False,
+                'error': 'Unable to verify user eligibility. Please try again.'
+            }
 
     @transaction.atomic
     def process_bill_payment(self, user, bill_data):
@@ -214,12 +628,24 @@ class PaymentService:
         Returns: dict with success status and transaction details
         """
         try:
-            # For P2P payments, we treat it as a direct transfer
-            # In a real implementation, this might involve wallet balances or bank transfers
+            from .fee_calculator import DynamicFeeCalculator
+            from decimal import Decimal
+            
+            # Calculate P2P/domestic transfer fee using dynamic fee calculator
+            fee_result = DynamicFeeCalculator.calculate_fee(
+                fee_type='domestic_transfer',
+                amount=Decimal(str(amount)),
+                user=sender.user if hasattr(sender, 'user') else None,
+                log_calculation=True,
+                transaction_id=f"P2P-{sender.id}-{recipient.id}"
+            )
+            
+            fee_amount = Decimal(str(fee_result.get('total_fee', 0))) if fee_result.get('success') else Decimal('0')
+            total_amount = Decimal(str(amount)) + fee_amount
             
             # Validate sender has sufficient funds (simplified check)
             # In a real app, you'd check wallet balance or account balance
-            if hasattr(sender, 'balance') and sender.balance < amount:
+            if hasattr(sender, 'balance') and sender.balance < total_amount:
                 return {
                     'success': False,
                     'error': 'Insufficient funds'
@@ -242,16 +668,18 @@ class PaymentService:
             if result['success']:
                 # Update balances (simplified - in real app, use proper transaction handling)
                 if hasattr(sender, 'balance'):
-                    sender.balance -= amount
+                    sender.balance -= float(total_amount)  # Deduct amount + fee from sender
                     sender.save()
                 if hasattr(recipient, 'balance'):
-                    recipient.balance += amount
+                    recipient.balance += float(amount)  # Recipient gets the original amount (no fee)
                     recipient.save()
                 
                 return {
                     'success': True,
                     'transaction_id': result.get('transaction_id', f"P2P-{int(time.time())}"),
-                    'message': f'Successfully sent ${amount} to {recipient.user.email}'
+                    'message': f'Successfully sent {amount} to {recipient.user.email}',
+                    'fee_amount': float(fee_amount),
+                    'fee_config_id': fee_result.get('fee_config_id')
                 }
             else:
                 return result

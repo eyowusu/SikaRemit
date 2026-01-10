@@ -1,5 +1,6 @@
 from django.template.loader import render_to_string
 from django.http import HttpResponse
+from django.db.models import Sum
 from .models.payment import Payment
 from datetime import datetime, timedelta
 import csv

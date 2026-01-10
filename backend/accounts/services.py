@@ -10,61 +10,184 @@ from payments.models.payment_log import PaymentLog
 import stripe
 from django.utils import timezone
 from .tasks import send_payment_receipt
-from paypalrestsdk import payments as paypal
 import time
 import requests
 from django.core.cache import cache
+import json
+from .mfa import MFAService
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
 
 class AuthService:
     @staticmethod
+    def auto_identify_user_type(email, current_user_type=None):
+        """
+        Auto-identify user type based on email patterns and other attributes
+        Returns suggested user_type (1=Admin, 2=merchant, 3=customer)
+        
+        SECURITY: Admin accounts can ONLY be created via Django admin or management commands.
+        Public registration always defaults to Customer (3).
+        """
+        # SECURITY: Never allow admin creation via public registration
+        # Admin accounts must be created by existing admins via Django admin panel
+        if current_user_type == 1:
+            logger.warning(f"Attempted admin registration blocked for email: {email}")
+            return 3  # Force to customer
+        
+        # If a valid non-admin type is provided, use it
+        if current_user_type in [2, 3]:
+            return current_user_type
+
+        # Default to Customer for public registration
+        return 3  # Customer
+
+    @staticmethod
+    def get_user_type_display_info(user_type):
+        """
+        Get display information for user types including labels, colors, and icons
+        """
+        type_info = {
+            1: {  # Admin
+                'label': 'Admin',
+                'color': '#dc2626',  # red-600
+                'bgColor': '#fef2f2',  # red-50
+                'icon': '👑',
+                'description': 'Full system access'
+            },
+            2: {  # Merchant
+                'label': 'Merchant',
+                'color': '#2563eb',  # blue-600
+                'bgColor': '#eff6ff',  # blue-50
+                'icon': '🏪',
+                'description': 'Business operations'
+            },
+            3: {  # Customer
+                'label': 'Customer',
+                'color': '#16a34a',  # green-600
+                'bgColor': '#f0fdf4',  # green-50
+                'icon': '👤',
+                'description': 'End user'
+            }
+        }
+        return type_info.get(user_type, {
+            'label': 'Unknown',
+            'color': '#6b7280',  # gray-500
+            'bgColor': '#f9fafb',  # gray-50
+            'icon': '❓',
+            'description': 'Unknown type'
+        })
+
+    @staticmethod
     def create_user(email, password, user_type, **extra_fields):
         """User registration with role-specific profile creation"""
+        from django.db import transaction
+        
         if User.objects.filter(email=email).exists():
             raise ValidationError('User with this email already exists')
             
         # Set username to email if not provided
         username = extra_fields.pop('username', None) or email
         
-        user = User.objects.create_user(
-            username=username,
-            email=email,
-            password=password,
-            user_type=user_type,
-            **extra_fields
-        )
+        # Ensure phone is always provided (default to empty string)
+        phone = extra_fields.pop('phone', '')
         
-        # Create role-specific profile
-        if user_type == 2:  # merchant
-            Merchant.objects.create(user=user)
-        elif user_type == 3:  # customer
-            Customer.objects.create(user=user)
+        with transaction.atomic():
+            user = User.objects.create_user(
+                username=username,
+                email=email,
+                password=password,
+                user_type=user_type,
+                phone=phone,
+                **extra_fields
+            )
             
+            # Create role-specific profile
+            if user_type == 2:  # merchant
+                Merchant.objects.create(user=user)
+            elif user_type == 3:  # customer
+                # Check if Customer already exists (defensive programming)
+                if not hasattr(user, 'customer_profile'):
+                    Customer.objects.create(user=user)
+                    
         return user
 
     @staticmethod
     def get_tokens_for_user(user):
         """Generate JWT tokens with custom claims"""
-        refresh = RefreshToken.for_user(user)
+        try:
+            refresh = RefreshToken.for_user(user)
+            
+            # Map user_type to role for frontend compatibility
+            role_mapping = {
+                1: 'admin',
+                2: 'merchant', 
+                3: 'customer'
+            }
+            
+            return {
+                'refresh': str(refresh),
+                'access': str(refresh.access_token),
+                'user_id': user.id,
+                'user_type': user.user_type,
+                'role': role_mapping.get(user.user_type, 'customer'),
+                'is_verified': user.is_verified,
+                'expires_in': 900  # 15 minutes in seconds
+            }
+        except Exception as e:
+            logger.error(f"Failed to generate tokens for user {user.email if user else 'unknown'}: {str(e)}")
+            raise e
+
+    @staticmethod
+    def refresh_tokens(refresh_token):
+        """Refresh JWT tokens"""
+        try:
+            refresh = RefreshToken(refresh_token)
+            user = refresh.user
+            
+            # Map user_type to role for frontend compatibility
+            role_mapping = {
+                1: 'admin',
+                2: 'merchant', 
+                3: 'customer'
+            }
+            
+            return {
+                'refresh': str(refresh),
+                'access': str(refresh.access_token),
+                'user_id': user.id,
+                'user_type': user.user_type,
+                'role': role_mapping.get(user.user_type, 'customer'),
+                'is_verified': user.is_verified,
+                'expires_in': 900  # 15 minutes in seconds
+            }
+        except Exception as e:
+            raise ValidationError('Invalid refresh token')
+
+    @staticmethod
+    def verify_mobile_money_webhook(payload, signature, provider):
+        """Verify mobile money webhook signature"""
+        import hmac
+        import hashlib
         
-        # Map user_type to role for frontend compatibility
-        role_mapping = {
-            1: 'admin',
-            2: 'merchant', 
-            3: 'customer'
-        }
+        if provider not in ['mtn', 'telecel', 'airtel_tigo']:
+            raise ValidationError('Invalid provider')
+            
+        # Parse payload if it's bytes
+        if isinstance(payload, bytes):
+            payload = json.loads(payload.decode('utf-8'))
         
-        return {
-            'refresh': str(refresh),
-            'access': str(refresh.access_token),
-            'user_id': user.id,
-            'user_type': user.user_type,
-            'role': role_mapping.get(user.user_type, 'customer'),
-            'is_verified': user.is_verified,
-            'expires_in': 900  # 15 minutes in seconds
-        }
+        secret = settings.MOBILE_MONEY_WEBHOOK_SECRET or 'test-secret'
+        expected_signature = hmac.new(
+            secret.encode(),
+            json.dumps(payload, sort_keys=True).encode(),
+            hashlib.sha256
+        ).hexdigest()
+        
+        if not hmac.compare_digest(signature, expected_signature):
+            raise ValidationError('Invalid signature')
+            
+        return payload
 
     @staticmethod
     def validate_login(email, password):
@@ -84,6 +207,133 @@ class AuthService:
             raise ValidationError('mfa_required')
             
         return user
+
+    @staticmethod
+    def get_account_balance(user):
+        """Get account balance for user"""
+        try:
+            # For now, return a mock balance since we don't have a balance model yet
+            # In production, this would query the user's account balance
+            return {
+                'available': 1250.75,
+                'pending': 150.00,
+                'currency': 'USD',
+                'lastUpdated': timezone.now().isoformat()
+            }
+        except Exception as e:
+            logger.error(f'Error getting account balance for user {user.id}: {str(e)}')
+            return {
+                'available': 0.00,
+                'pending': 0.00,
+                'currency': 'USD',
+                'lastUpdated': timezone.now().isoformat()
+            }
+    
+    @staticmethod
+    def has_concurrent_sessions(user):
+        """
+        Check if user has concurrent active sessions.
+        Returns True if user has more than one active session.
+        """
+        from django.contrib.sessions.models import Session
+        from django.utils import timezone
+        
+        try:
+            # Get all active sessions
+            active_sessions = Session.objects.filter(
+                expire_date__gte=timezone.now()
+            )
+            
+            # Count sessions for this user
+            user_sessions = 0
+            for session in active_sessions:
+                session_data = session.get_decoded()
+                if session_data.get('_auth_user_id') == str(user.id):
+                    user_sessions += 1
+                    
+            # Concurrent if more than 1 active session
+            return user_sessions > 1
+            
+        except Exception as e:
+            logger.error(f'Error checking concurrent sessions for user {user.id}: {str(e)}')
+            return False
+    
+    @staticmethod
+    def test_session_functionality(request):
+        """
+        Test session functionality for debugging purposes.
+        Returns session information and diagnostics.
+        """
+        from django.contrib.sessions.models import Session
+        from django.utils import timezone
+        
+        try:
+            user = request.user if request.user.is_authenticated else None
+            session_key = request.session.session_key
+            
+            # Get session info
+            session_info = {
+                'session_key': session_key,
+                'is_authenticated': request.user.is_authenticated,
+                'user_id': user.id if user else None,
+                'user_email': user.email if user else None,
+                'session_data': dict(request.session.items()) if session_key else {},
+            }
+            
+            # Count active sessions
+            if user:
+                active_sessions = Session.objects.filter(
+                    expire_date__gte=timezone.now()
+                )
+                user_session_count = sum(
+                    1 for s in active_sessions 
+                    if s.get_decoded().get('_auth_user_id') == str(user.id)
+                )
+                session_info['user_active_sessions'] = user_session_count
+                session_info['has_concurrent_sessions'] = user_session_count > 1
+            
+            # Total active sessions
+            total_active = Session.objects.filter(
+                expire_date__gte=timezone.now()
+            ).count()
+            session_info['total_active_sessions'] = total_active
+            
+            return session_info
+            
+        except Exception as e:
+            logger.error(f'Error testing session functionality: {str(e)}')
+            return {
+                'error': str(e),
+                'session_test': 'failed'
+            }
+
+    @staticmethod
+    def setup_mfa(user):
+        """Setup Multi-Factor Authentication for user"""
+        try:
+            # Check if user already has MFA enabled
+            if user.mfa_enabled:
+                raise ValidationError('MFA is already enabled for this user')
+
+            # Generate TOTP secret
+            secret = MFAService.generate_secret(user)
+
+            # Generate OTP URI for authenticator apps
+            otp_uri = MFAService.get_otp_uri(user, secret)
+
+            # Generate QR code
+            qr_code = MFAService.generate_qr_code(otp_uri)
+
+            return {
+                'secret': secret,
+                'otp_uri': otp_uri,
+                'qr_code': qr_code.decode('utf-8') if qr_code else None,
+                'message': 'Scan the QR code with your authenticator app to set up 2FA'
+            }
+        except Exception as e:
+            logger.error(f'Error setting up MFA for user {user.email}: {str(e)}')
+            raise ValidationError(f'Failed to setup MFA: {str(e)}')
+
 
 class PaymentService:
     @staticmethod
@@ -202,7 +452,7 @@ class PaymentService:
         elif data['payment_method'] == 'QR_CODE':
             return PaymentService._process_qr_payment(payment, data)
         else:
-            return PaymentService._process_wallet_payment(payment, data)
+            raise ValidationError(f'Unsupported payment method: {data["payment_method"]}')
     
     @staticmethod
     def _validate_mobile_money(number, provider):
@@ -369,10 +619,6 @@ class PaymentService:
             payment.save()
             raise Exception(f'Bank transfer payment failed: {str(e)}')
 
-    @staticmethod
-    def _process_wallet_payment(payment, data):
-        # Implement wallet payment processing logic
-        pass
 
     @staticmethod
     def _process_google_pay(payment, data):
@@ -432,31 +678,28 @@ class PaymentService:
     
     @staticmethod
     def _process_qr_payment(payment, data):
-        """Process QR payment via PayPal"""
+        """Process QR payment using internal QR gateway"""
         try:
-            # Initialize PayPal client
-            paypal_client = paypal.PayPalClient(
-                client_id=settings.PAYPAL_CLIENT_ID,
-                client_secret=settings.PAYPAL_SECRET,
-                environment='sandbox'
+            from payments.gateways.qr import QRPaymentGateway
+            
+            qr_gateway = QRPaymentGateway()
+            result = qr_gateway.process_payment(
+                amount=payment.amount,
+                currency=payment.currency,
+                payment_method=payment.payment_method,
+                customer=payment.customer,
+                merchant=payment.merchant,
+                metadata={'qr_code': data.get('qr_code')}
             )
             
-            # Create QR code order
-            order = paypal_client.create_qr_order(
-                amount=data['amount'],
-                currency=data['currency']
-            )
-            
-            payment.paypal_order_id = order.id
-            payment.qr_data = order.qr_code_url
-            payment.status = 'pending'
-            payment.save()
-            
-            # Poll for completion (in practice would use webhooks)
-            if paypal_client.check_order_complete(order.id):
+            if result.get('success'):
                 payment.status = 'completed'
-                payment.save()
+                payment.transaction_id = result.get('transaction_id')
+            else:
+                payment.status = 'failed'
+                payment.error_message = result.get('error')
             
+            payment.save()
             return payment
             
         except Exception as e:
@@ -464,72 +707,6 @@ class PaymentService:
             payment.save()
             raise Exception(f'QR payment failed: {str(e)}')
 
-class LoyaltyService:
-    """
-    Enhanced with:
-    - Tier-based rewards
-    - Fraud detection
-    - Point redemption
-    """
-    REWARD_RATE = 0.01  # 1 point per $1 spent
-    TIER_BONUS = {
-        'basic': 1.0,
-        'silver': 1.1,
-        'gold': 1.25, 
-        'platinum': 1.5
-    }
-    FRAUD_THRESHOLD = 5  # 5x average payment
-    POINTS_PER_DOLLAR = 1
-    TIER_THRESHOLDS = {
-        'basic': 0,
-        'silver': 100,
-        'gold': 500,
-        'platinum': 1000
-    }
-
-    @classmethod
-    def add_points(cls, customer, amount):
-        """Add points with tier bonuses"""
-        points = int(amount * cls.REWARD_RATE * cls.TIER_BONUS[customer.loyalty_tier])
-        customer.loyalty_points += points
-        
-        # Update payment history (last 10 payments)
-        history = customer.payment_history[-9:] + [amount]
-        customer.payment_history = history
-        customer.save()
-        customer.update_tier()
-        return points
-
-    @classmethod
-    def check_fraud(cls, customer, amount):
-        """Detect anomalous payments"""
-        if len(customer.payment_history) < 3:
-            return False
-            
-        avg = sum(customer.payment_history) / len(customer.payment_history)
-        return amount > (avg * cls.FRAUD_THRESHOLD)
-
-    @classmethod
-    def update_loyalty(cls, customer, amount):
-        # Calculate points earned (1 point per dollar spent)
-        points_earned = int(amount * cls.POINTS_PER_DOLLAR)
-        customer.loyalty_points += points_earned
-        
-        # Update tier based on points
-        for tier, threshold in sorted(cls.TIER_THRESHOLDS.items(), 
-                                    key=lambda x: x[1], reverse=True):
-            if customer.loyalty_points >= threshold:
-                customer.loyalty_tier = tier
-                break
-                
-        # Update average payment amount
-        total_transactions = PaymentTransaction.objects.filter(customer=customer).count()
-        customer.avg_payment_amount = (
-            (customer.avg_payment_amount * total_transactions) + amount
-        ) / (total_transactions + 1)
-        
-        customer.save()
-        return points_earned
 
 def log_audit_action(action, admin, user=None, metadata=None):
     """

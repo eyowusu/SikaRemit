@@ -7,4 +7,4 @@ Here are your MFA backup codes (each can be used once):
 
 Store these securely. If you lose them, you can generate new codes (invalidating these).
 
-- The PayGlobe Team
+- The SikaRemit Team

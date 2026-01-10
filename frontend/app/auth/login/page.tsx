@@ -1,48 +1,52 @@
 'use client'
 
+import { Button } from '@/components/ui/button'
 import { LoginForm } from '@/components/auth/login-form'
+import Link from 'next/link'
 
 export default function LoginPage() {
+  const handleGoogleLogin = async () => {
+    try {
+      // Redirect to backend Google OAuth endpoint with callback URL
+      const frontendUrl = window.location.origin
+      window.location.href = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/v1/accounts/google/?callback_url=${encodeURIComponent(frontendUrl)}`
+    } catch (error) {
+      console.error('Google sign in failed:', error)
+      alert('Failed to initiate Google sign-in. Please try again.')
+    }
+  }
+
   return (
-    <div className="container relative h-screen flex-col items-center justify-center grid lg:max-w-none lg:grid-cols-2 lg:px-0">
-      <div className="relative hidden h-full flex-col bg-muted p-10 text-white lg:flex dark:border-r">
-        <div className="absolute inset-0 bg-zinc-900" />
-        <div className="relative z-20 flex items-center text-lg font-medium">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="mr-2 h-6 w-6"
-          >
-            <path d="M15 6v12a3 3 0 1 0 3-3H6a3 3 0 1 0 3 3V6a3 3 0 1 0-3 3h12a3 3 0 1 0-3-3" />
-          </svg>
-          PayGlobe
+    <div className="space-y-4">
+      <h2 className="text-xl font-medium text-center">Welcome Back</h2>
+      <p className="text-sm text-gray-600 text-center">Enter your credentials to access your dashboard</p>
+      
+      <LoginForm />
+      
+      <div className="relative">
+        <div className="absolute inset-0 flex items-center">
+          <div className="w-full border-t border-gray-300" />
         </div>
-        <div className="relative z-20 mt-auto">
-          <blockquote className="space-y-2">
-            <p className="text-lg">
-              &ldquo;The fastest way to manage your payments and transactions.&rdquo;
-            </p>
-            <footer className="text-sm">PayGlobe Team</footer>
-          </blockquote>
+        <div className="relative flex justify-center text-sm">
+          <span className="px-2 bg-gray-50 text-gray-500">Or continue with</span>
         </div>
       </div>
-      <div className="lg:p-8">
-        <div className="mx-auto flex w-full flex-col justify-center space-y-6 sm:w-[350px]">
-          <div className="flex flex-col space-y-2 text-center">
-            <h1 className="text-2xl font-semibold tracking-tight">
-              Welcome back
-            </h1>
-            <p className="text-sm text-muted-foreground">
-              Enter your credentials to sign in to your account
-            </p>
-          </div>
-          <LoginForm />
-        </div>
+      
+      <Button 
+        variant="outline" 
+        className="w-full"
+        onClick={handleGoogleLogin}
+      >
+        Continue with Google
+      </Button>
+      
+      <div className="flex justify-between text-sm">
+        <Link href="/auth/forgot-password" className="font-medium text-blue-600 hover:text-blue-500">
+          Forgot your password?
+        </Link>
+        <Link href="/auth/register" className="font-medium text-blue-600 hover:text-blue-500">
+          Register
+        </Link>
       </div>
     </div>
   )

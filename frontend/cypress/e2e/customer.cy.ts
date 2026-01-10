@@ -10,7 +10,7 @@ describe('Customer Authentication', () => {
 
   it('customer login sets authentication tokens', () => {
     cy.loginAsCustomer()
-    cy.window().then((win) => {
+    cy.window().then((win: Window) => {
       expect(win.localStorage.getItem('next-auth.session-token')).to.exist
       expect(win.localStorage.getItem('authToken')).to.exist
     })

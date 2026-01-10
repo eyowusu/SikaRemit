@@ -1,12 +1,49 @@
 from .base import PaymentGateway
 import stripe
 from django.conf import settings
+import logging
+logger = logging.getLogger(__name__)
+from django.http import JsonResponse
 
 class StripeGateway(PaymentGateway):
     """Stripe payment gateway implementation for card payments"""
     
+    signature_header = 'stripe-signature'
+    
     def __init__(self):
+        if not settings.STRIPE_SECRET_KEY:
+            raise ValueError("Stripe secret key not configured")
+            
         stripe.api_key = settings.STRIPE_SECRET_KEY
+        
+        # Test connection
+        try:
+            stripe.Account.retrieve()
+        except stripe.error.AuthenticationError:
+            logger.error("Invalid Stripe API key configuration")
+            raise
+    
+    def get_webhook_secret(self):
+        return settings.STRIPE_WEBHOOK_SECRET
+        
+    def parse_webhook(self, request):
+        payload = request.body
+        sig_header = request.headers.get(self.signature_header)
+        return stripe.Webhook.construct_event(
+            payload, 
+            sig_header, 
+            self.get_webhook_secret()
+        )
+        
+    def process_webhook(self, event):
+        event_type = event['type']
+        
+        if event_type == 'payment_intent.succeeded':
+            return self._handle_payment_success(event)
+        elif event_type == 'charge.refunded':
+            return self._handle_refund(event)
+        else:
+            return JsonResponse({'status': 'ignored'})
     
     def process_payment(self, amount, currency, payment_method, customer, merchant, metadata=None):
         try:

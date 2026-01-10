@@ -1,4 +1,4 @@
-from payments.models.subscription import Subscription
+from payments.models.subscriptions import Subscription
 
 class SubscriptionService:
     """Handles subscription business logic"""

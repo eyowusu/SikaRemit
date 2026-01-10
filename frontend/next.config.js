@@ -4,6 +4,11 @@ const withBundleAnalyzer = require('@next/bundle-analyzer')({
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Production optimizations
+  output: 'standalone',
+  poweredByHeader: false,
+  compress: true,
+  
   // Remove rewrites for production - use direct API calls
   async rewrites() {
     // Only add rewrites in development
@@ -17,16 +22,65 @@ const nextConfig = {
     }
     return [];
   },
-  env: {
-    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000',
-    NEXTAUTH_URL: process.env.NEXTAUTH_URL || 'http://localhost:3000',
-    NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET || 'development-secret-key-change-in-production'
+  
+  // Security headers
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          {
+            key: 'X-DNS-Prefetch-Control',
+            value: 'on',
+          },
+          {
+            key: 'Strict-Transport-Security',
+            value: 'max-age=63072000; includeSubDomains; preload',
+          },
+          {
+            key: 'X-Content-Type-Options',
+            value: 'nosniff',
+          },
+          {
+            key: 'X-Frame-Options',
+            value: 'DENY',
+          },
+          {
+            key: 'X-XSS-Protection',
+            value: '1; mode=block',
+          },
+          {
+            key: 'Referrer-Policy',
+            value: 'strict-origin-when-cross-origin',
+          },
+          {
+            key: 'Permissions-Policy',
+            value: 'camera=(), microphone=(), geolocation=(self)',
+          },
+        ],
+      },
+    ];
   },
+  
+  env: {
+    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
+  },
+  
   experimental: {
     optimizeCss: true,
   },
-  // Output standalone for Docker deployment
-  output: 'standalone',
+  
+  // Image optimization
+  images: {
+    domains: ['api.sikaremit.com', 'localhost'],
+    formats: ['image/avif', 'image/webp'],
+  },
+  
+  serverExternalPackages: [],
+  
+  generateBuildId: async () => {
+    return 'build-' + Date.now()
+  },
 }
 
 module.exports = withBundleAnalyzer(nextConfig);

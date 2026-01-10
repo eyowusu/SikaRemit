@@ -1,16 +1,58 @@
 from rest_framework import serializers
 from ..models import UserActivity
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
+
+class UserSerializer(serializers.ModelSerializer):
+    firstName = serializers.CharField(source='first_name')
+    lastName = serializers.CharField(source='last_name')  
+    isActive = serializers.BooleanField(source='is_active')
+    createdAt = serializers.DateTimeField(source='date_joined')
+    
+    class Meta:
+        model = User
+        fields = ['id', 'email', 'firstName', 'lastName', 'isActive', 'createdAt']
 
 class UserActivitySerializer(serializers.ModelSerializer):
-    event_type_display = serializers.CharField(source='get_event_type_display', read_only=True)
+    action = serializers.CharField(source='event_type')
+    user_email = serializers.CharField(source='user.email', read_only=True)
+    admin_email = serializers.CharField(source='user.email', read_only=True)  # For admin context
+    timestamp = serializers.DateTimeField(source='created_at')
     
     class Meta:
         model = UserActivity
         fields = [
             'id', 
-            'event_type',
-            'event_type_display',
-            'ip_address',
-            'metadata',
-            'created_at'
+            'action',
+            'user_email',
+            'admin_email', 
+            'timestamp',
+            'metadata'
         ]
+
+class AdminUserSerializer(serializers.ModelSerializer):
+    user_type = serializers.IntegerField()
+    is_active = serializers.BooleanField()
+    created_at = serializers.DateTimeField(source='date_joined', read_only=True)
+    
+    class Meta:
+        model = User
+        fields = [
+            'id', 'email', 'first_name', 'last_name', 
+            'user_type', 'is_active', 'created_at'
+        ]
+        read_only_fields = ['id', 'created_at']
+    
+    def create(self, validated_data):
+        # Set default password if not provided
+        password = validated_data.pop('password', None)
+        user = super().create(validated_data)
+        if password:
+            user.set_password(password)
+            user.save()
+        else:
+            # Generate a random password or handle accordingly
+            user.set_password('temp123!')  # Temporary password
+            user.save()
+        return user

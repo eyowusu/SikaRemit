@@ -1,9 +1,12 @@
 from django.contrib import admin
 from .models import (
     AdminActivity, PasswordResetToken, AuthLog, BackupVerification,
-    Customer, Transaction, PaymentLog, Product, Merchant, Session,
-    UserActivity, Notification, Payout
+    Transaction, PaymentLog, Session,
+    UserActivity, Payout
 )
+from users.models import Customer, Merchant
+# NOTE: Product is now in merchants app - admin registration is in merchants/admin.py
+# NOTE: Notification is now in notifications app - admin registration is in notifications/admin.py
 
 @admin.register(AdminActivity)
 class AdminActivityAdmin(admin.ModelAdmin):
@@ -39,11 +42,11 @@ class BackupVerificationAdmin(admin.ModelAdmin):
     search_fields = ('notes',)
     readonly_fields = ('started_at', 'completed_at')
 
-@admin.register(Customer)
-class CustomerAdmin(admin.ModelAdmin):
-    list_display = ('user', 'loyalty_points', 'loyalty_tier')
-    list_filter = ('loyalty_tier',)
-    search_fields = ('user__email',)
+# @admin.register(Customer)
+# class CustomerAdmin(admin.ModelAdmin):
+#     list_display = ('user', 'loyalty_points', 'loyalty_tier')
+#     list_filter = ('loyalty_tier',)
+#     search_fields = ('user__email',)
 
 @admin.register(Transaction)
 class TransactionAdmin(admin.ModelAdmin):
@@ -57,17 +60,13 @@ class PaymentLogAdmin(admin.ModelAdmin):
     list_filter = ('payment_type', 'created_at')
     search_fields = ('user__email', 'recipient_name', 'biller_name')
 
-@admin.register(Product)
-class ProductAdmin(admin.ModelAdmin):
-    list_display = ('name', 'price', 'store', 'created_at')
-    list_filter = ('created_at',)
-    search_fields = ('name', 'store__email')
+# NOTE: ProductAdmin moved to merchants/admin.py
 
-@admin.register(Merchant)
-class MerchantAdmin(admin.ModelAdmin):
-    list_display = ('user', 'business_name', 'approved', 'approved_at')
-    list_filter = ('approved',)
-    search_fields = ('user__email', 'business_name')
+# @admin.register(Merchant)
+# class MerchantAdmin(admin.ModelAdmin):
+#     list_display = ('user', 'business_name', 'approved', 'approved_at')
+#     list_filter = ('approved',)
+#     search_fields = ('user__email', 'business_name')
 
 @admin.register(Session)
 class SessionAdmin(admin.ModelAdmin):
@@ -81,11 +80,7 @@ class UserActivityAdmin(admin.ModelAdmin):
     list_filter = ('event_type', 'created_at')
     search_fields = ('user__email',)
 
-@admin.register(Notification)
-class NotificationAdmin(admin.ModelAdmin):
-    list_display = ('user', 'title', 'notification_type', 'is_read', 'created_at')
-    list_filter = ('notification_type', 'is_read', 'created_at')
-    search_fields = ('user__email', 'title', 'message')
+# NOTE: NotificationAdmin moved to notifications/admin.py
 
 @admin.register(Payout)
 class PayoutAdmin(admin.ModelAdmin):

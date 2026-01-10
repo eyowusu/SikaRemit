@@ -16,8 +16,11 @@ export function useMerchant(merchantId: string) {
         
         const merchant: Merchant = {
           id: data.id,
+          name: data.name || '',
           email: data.email,
-          businessName: data.businessName || '',
+          business_name: data.business_name || data.businessName || '',
+          status: data.status || 'active',
+          created_at: data.created_at || new Date().toISOString(),
           balance: data.balance || 0,
           available_balance: data.available_balance || data.balance || 0,
           pending_balance: data.pending_balance || 0,
@@ -33,9 +36,12 @@ export function useMerchant(merchantId: string) {
         setMerchant(merchant)
         
         setLimits({
-          maxAmount: 10000,
-          currency: 'USD',
-          allowedMethods: ['card', 'bank_transfer']
+          daily_limit: data.daily_limit || 10000,
+          monthly_limit: data.monthly_limit || 100000,
+          per_transaction_limit: data.per_transaction_limit || 5000,
+          daily_used: data.daily_used || 0,
+          monthly_used: data.monthly_used || 0,
+          currency: data.currency || 'USD'
         })
       } catch (err) {
         setError(err instanceof Error ? err : new Error('Failed to load merchant'))

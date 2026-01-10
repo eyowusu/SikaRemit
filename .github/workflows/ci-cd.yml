@@ -111,7 +111,7 @@ jobs:
       with:
         postgresql version: '13'
         postgresql password: postgres
-        postgresql db: payglobe_test
+        postgresql db: SikaRemit_test
 
     - name: Install backend dependencies
       working-directory: backend
@@ -123,7 +123,7 @@ jobs:
     - name: Run backend migrations
       working-directory: backend
       env:
-        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/payglobe_test
+        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/SikaRemit_test
       run: |
         python manage.py migrate
 

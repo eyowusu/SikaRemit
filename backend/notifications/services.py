@@ -11,18 +11,19 @@ logger = logging.getLogger(__name__)
 
 class NotificationService:
     @staticmethod
-    def send_email_notification(user, subject, message):
+    def send_email_notification_to_address(email, subject, message):
+        """Send email notification to any email address"""
         try:
             send_mail(
                 subject,
                 message,
                 settings.DEFAULT_FROM_EMAIL,
-                [user.email],
+                [email],
                 fail_silently=False,
             )
             return True
         except Exception as e:
-            logger.error(f"Email send failed: {str(e)}")
+            logger.error(f"Email send to {email} failed: {str(e)}")
             return False
 
     @staticmethod
@@ -92,10 +93,21 @@ class NotificationService:
             
     @classmethod
     def send_push_notification(cls, user, notification):
-        if not NotificationPreferences.objects.get(user=user).push_enabled:
-            return False
-            
         try:
+            # Get or create notification preferences
+            prefs, created = NotificationPreferences.objects.get_or_create(
+                user=user,
+                defaults={
+                    'email_enabled': True,
+                    'sms_enabled': False,
+                    'push_enabled': True,
+                    'web_enabled': True
+                }
+            )
+            
+            if not prefs.push_enabled:
+                return False
+                
             # Implementation would use Firebase Cloud Messaging or similar
             # This is a placeholder for the actual push notification logic
             return cls._send_fcm_push(user, notification)

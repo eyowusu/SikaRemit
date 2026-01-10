@@ -1,15 +1,393 @@
 from rest_framework import viewsets, permissions, status
-from rest_framework.decorators import action, api_view
+from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
 from django.db.models import Q, Sum, Count
 from datetime import datetime, timedelta
+from django.utils import timezone
+from django.contrib.auth import get_user_model
 from payments.models.transaction import Transaction
+from invoice.models import Invoice, InvoiceItem
 
-from .models import Store, Product, MerchantOnboarding
-from .serializers import StoreSerializer, ProductSerializer, OnboardingSerializer, VerificationSerializer
-from users.permissions import IsMerchantUser, IsOwnerOrAdmin
+from .models import Store, Product, MerchantOnboarding, MerchantApplication, MerchantInvitation, ReportTemplate, Report, ScheduledReport, MerchantSettings, MerchantNotificationSettings, MerchantPayoutSettings
+from users.models import MerchantCustomer  # MerchantCustomer moved to users app
+from .serializers import StoreSerializer, ProductSerializer, OnboardingSerializer, VerificationSerializer, MerchantApplicationSerializer, MerchantInvitationSerializer, ReportTemplateSerializer, ReportSerializer, ScheduledReportSerializer, MerchantCustomerSerializer, CreateMerchantCustomerSerializer, OnboardMerchantCustomerSerializer, MerchantSettingsSerializer, MerchantNotificationSettingsSerializer, MerchantPayoutSettingsSerializer, MerchantCustomerStatsSerializer
+from users.permissions import IsMerchantUser, IsOwnerOrAdmin, IsAdminUser
+from users.models import Merchant
 from .permissions import SubscriptionRequiredMixin
+from notifications.services import NotificationService
+
+class MerchantApplicationViewSet(viewsets.ModelViewSet):
+    """API for merchant applications"""
+    serializer_class = MerchantApplicationSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.user_type == 1:  # admin
+            return MerchantApplication.objects.all()
+        # Regular users cannot access applications
+        return MerchantApplication.objects.none()
+
+    def perform_create(self, serializer):
+        """Save application and send notification"""
+        application = serializer.save()
+
+        # Send notification to all admins about new application
+        admin_users = User.objects.filter(user_type=1)  # admins
+        for admin in admin_users:
+            NotificationService.create_notification(
+                user=admin,
+                title="New Merchant Application",
+                message=f"A new merchant application has been submitted by {application.contact_first_name} {application.contact_last_name} for {application.business_name}.",
+                level='info',
+                notification_type='merchant_application_submitted',
+                metadata={
+                    'application_id': str(application.id),
+                    'business_name': application.business_name,
+                    'contact_email': application.contact_email
+                }
+            )
+
+        # Send confirmation to applicant (if we had their user account)
+        # For now, we'll skip this as applicants don't have accounts yet
+
+    @action(detail=True, methods=['post'])
+    def approve(self, request, pk=None):
+        """Approve an application and create invitation"""
+        if not request.user.user_type == 1:  # admin only
+            return Response({'error': 'Admin access required'}, status=status.HTTP_403_FORBIDDEN)
+
+        application = self.get_object()
+        if application.status != 'pending':
+            return Response({'error': 'Application is not pending'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Update application status
+        application.status = 'approved'
+        application.reviewed_at = timezone.now()
+        application.reviewed_by = request.user
+        application.save()
+
+        # Create invitation
+        expires_at = timezone.now() + timedelta(days=14)
+        invitation = MerchantInvitation.objects.create(
+            email=application.contact_email,
+            business_name=application.business_name,
+            business_type=application.business_type,
+            phone_number=application.contact_phone,
+            notes=f"Application approved. Business: {application.business_name}",
+            expires_at=expires_at,
+            invited_by=request.user
+        )
+
+        # Send email notification to applicant
+        # Since applicants don't have user accounts yet, we'll send a direct email
+        NotificationService.send_email_notification_to_address(
+            email=application.contact_email,
+            subject="Your Merchant Application Has Been Approved",
+            message=f"""
+Dear {application.contact_first_name} {application.contact_last_name},
+
+Congratulations! Your merchant application for {application.business_name} has been approved.
+
+You can now complete your merchant registration by following this secure link:
+{settings.FRONTEND_URL}/auth/merchant/invite/{invitation.invitation_token}
+
+This invitation will expire in 14 days. Please complete your registration before then.
+
+If you have any questions, please contact our support team.
+
+Best regards,
+SikaRemit Team
+            """.strip()
+        )
+
+        return Response({
+            'message': 'Application approved and invitation sent',
+            'invitation_token': str(invitation.invitation_token)
+        })
+
+    @action(detail=True, methods=['post'])
+    def reject(self, request, pk=None):
+        """Reject an application with reason"""
+        if not request.user.user_type == 1:  # admin only
+            return Response({'error': 'Admin access required'}, status=status.HTTP_403_FORBIDDEN)
+
+        application = self.get_object()
+        reason = request.data.get('reason', '')
+
+        if not reason.strip():
+            return Response({'error': 'Rejection reason is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if application.status != 'pending':
+            return Response({'error': 'Application is not pending'}, status=status.HTTP_400_BAD_REQUEST)
+
+        application.status = 'rejected'
+        application.reviewed_at = timezone.now()
+        application.reviewed_by = request.user
+        application.review_notes = reason
+        application.save()
+
+        # Send rejection email notification
+        NotificationService.send_email_notification_to_address(
+            email=application.contact_email,
+            subject="Update on Your Merchant Application",
+            message=f"""
+Dear {application.contact_first_name} {application.contact_last_name},
+
+Thank you for your interest in becoming a SikaRemit merchant. After careful review of your application for {application.business_name}, we regret to inform you that we are unable to approve it at this time.
+
+Reason for rejection:
+{reason}
+
+If you believe this decision was made in error or if you have additional information that might change our decision, please contact our support team.
+
+We appreciate your understanding and wish you the best in your business endeavors.
+
+Best regards,
+SikaRemit Team
+            """.strip()
+        )
+
+        return Response({'message': 'Application rejected'})
+
+class MerchantInvitationViewSet(viewsets.ModelViewSet):
+    """API for merchant invitations"""
+    serializer_class = MerchantInvitationSerializer
+    permission_classes = [IsAuthenticated, IsAdminUser]
+
+    def perform_create(self, serializer):
+        """Create invitation and send email"""
+        invitation = serializer.save(invited_by=self.request.user)
+
+        # Send invitation email
+        NotificationService.send_email_notification_to_address(
+            email=invitation.email,
+            subject="You're Invited to Join SikaRemit as a Merchant",
+            message=f"""
+Dear Merchant,
+
+You have been invited to join SikaRemit as a merchant for {invitation.business_name}.
+
+Complete your registration by following this secure link:
+{settings.FRONTEND_URL}/auth/merchant/invite/{invitation.invitation_token}
+
+This invitation will expire in 14 days. Please complete your registration before then.
+
+If you have any questions, please contact our support team.
+
+Best regards,
+SikaRemit Team
+            """.strip()
+        )
+
+        return invitation
+
+    @action(detail=True, methods=['post'])
+    def resend(self, request, pk=None):
+        """Resend invitation email"""
+        invitation = self.get_object()
+        if invitation.status != 'pending':
+            return Response({'error': 'Can only resend pending invitations'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Update expiration if needed
+        if invitation.is_expired:
+            invitation.expires_at = timezone.now() + timedelta(days=14)
+            invitation.save()
+
+        # Send invitation email again
+        NotificationService.send_email_notification_to_address(
+            email=invitation.email,
+            subject="Reminder: You're Invited to Join SikaRemit as a Merchant",
+            message=f"""
+Dear Merchant,
+
+This is a reminder about your invitation to join SikaRemit as a merchant for {invitation.business_name}.
+
+Complete your registration by following this secure link:
+{settings.FRONTEND_URL}/auth/merchant/invite/{invitation.invitation_token}
+
+This invitation will expire in 14 days. Please complete your registration before then.
+
+If you have any questions, please contact our support team.
+
+Best regards,
+SikaRemit Team
+            """.strip()
+        )
+
+        return Response({'message': 'Invitation resent'})
+
+    @action(detail=True, methods=['post'])
+    def cancel(self, request, pk=None):
+        """Cancel invitation"""
+        invitation = self.get_object()
+        if invitation.status not in ['pending', 'expired']:
+            return Response({'error': 'Can only cancel pending or expired invitations'}, status=status.HTTP_400_BAD_REQUEST)
+
+        invitation.status = 'cancelled'
+        invitation.save()
+
+        return Response({'message': 'Invitation cancelled'})
+
+    @action(detail=False, methods=['post'])
+    def bulk_create(self, request):
+        """Create multiple invitations at once"""
+        invitations_data = request.data.get('invitations', [])
+        if not invitations_data:
+            return Response({'error': 'No invitations provided'}, status=status.HTTP_400_BAD_REQUEST)
+
+        created_invitations = []
+        errors = []
+
+        for i, inv_data in enumerate(invitations_data):
+            serializer = self.get_serializer(data=inv_data)
+            if serializer.is_valid():
+                invitation = serializer.save(invited_by=request.user)
+                created_invitations.append(serializer.data)
+                # TODO: Send invitation email
+            else:
+                errors.append({'index': i, 'errors': serializer.errors})
+
+        response_data = {'created': created_invitations}
+        if errors:
+            response_data['errors'] = errors
+
+        return Response(response_data, status=status.HTTP_207_MULTI_STATUS if errors else status.HTTP_201_CREATED)
+
+@api_view(['GET'])
+def validate_invitation_token(request, token):
+    """Validate invitation token and return invitation details"""
+    try:
+        invitation = MerchantInvitation.objects.get(invitation_token=token)
+    except MerchantInvitation.DoesNotExist:
+        return Response({'error': 'Invalid invitation token'}, status=status.HTTP_404_NOT_FOUND)
+
+    # Check if expired
+    if invitation.is_expired:
+        invitation.status = 'expired'
+        invitation.save()
+        return Response({'error': 'Invitation has expired'}, status=status.HTTP_410_GONE)
+
+    # Check if already used
+    if invitation.status == 'accepted':
+        return Response({'error': 'Invitation has already been used'}, status=status.HTTP_409_CONFLICT)
+
+    # Check if cancelled
+    if invitation.status == 'cancelled':
+        return Response({'error': 'Invitation has been cancelled'}, status=status.HTTP_410_GONE)
+
+    serializer = MerchantInvitationSerializer(invitation)
+    return Response(serializer.data)
+
+@api_view(['POST'])
+def accept_invitation(request, token):
+    """Accept invitation and create merchant account"""
+    try:
+        invitation = MerchantInvitation.objects.get(invitation_token=token)
+    except MerchantInvitation.DoesNotExist:
+        return Response({'error': 'Invalid invitation token'}, status=status.HTTP_404_NOT_FOUND)
+
+    # Validate invitation status
+    if invitation.status != 'pending':
+        if invitation.status == 'expired':
+            return Response({'error': 'Invitation has expired'}, status=status.HTTP_410_GONE)
+        elif invitation.status == 'cancelled':
+            return Response({'error': 'Invitation has been cancelled'}, status=status.HTTP_410_GONE)
+        elif invitation.status == 'accepted':
+            return Response({'error': 'Invitation has already been used'}, status=status.HTTP_409_CONFLICT)
+
+    # Validate required fields
+    required_fields = ['firstName', 'lastName', 'email', 'password', 'businessName']
+    for field in required_fields:
+        if not request.data.get(field):
+            return Response({'error': f'{field} is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Check if user with this email already exists
+    User = get_user_model()
+    if User.objects.filter(email=request.data['email']).exists():
+        return Response({'error': 'User with this email already exists'}, status=status.HTTP_409_CONFLICT)
+
+    try:
+        # Create user
+        user = User.objects.create_user(
+            email=request.data['email'],
+            password=request.data['password'],
+            first_name=request.data['firstName'],
+            last_name=request.data['lastName'],
+            user_type=2,  # merchant
+            phone=request.data.get('phoneNumber', ''),
+            is_verified=True
+        )
+
+        # Create merchant profile
+        merchant = Merchant.objects.create(
+            user=user,
+            business_name=request.data['businessName'],
+            tax_id=request.data.get('taxId', ''),
+            bank_account_number='',  # Will be set during onboarding
+            is_approved=True  # Pre-approved since invited
+        )
+
+        # Update invitation
+        invitation.status = 'accepted'
+        invitation.accepted_at = timezone.now()
+        invitation.merchant_profile = merchant
+        invitation.save()
+
+        # Create onboarding record
+        MerchantOnboarding.objects.create(merchant=merchant)
+
+        # Send welcome notification to the new merchant
+        NotificationService.create_notification(
+            user=user,
+            title="Welcome to SikaRemit!",
+            message=f"Welcome {user.first_name}! Your merchant account for {merchant.business_name} has been created successfully. Please complete your onboarding to start accepting payments.",
+            level='success',
+            notification_type='merchant_account_created',
+            metadata={
+                'merchant_id': str(merchant.id),
+                'business_name': merchant.business_name
+            }
+        )
+
+        # Send welcome email
+        NotificationService.send_email_notification(
+            user=user,
+            subject="Welcome to SikaRemit - Account Created Successfully",
+            message=f"""
+Dear {user.first_name},
+
+Congratulations! Your merchant account for {merchant.business_name} has been created successfully.
+
+You can now log in to your merchant dashboard to:
+- Set up your store and products
+- Configure payment methods
+- View transaction history
+- Access analytics and reports
+
+Your login credentials:
+Email: {user.email}
+Password: [The password you set during registration]
+
+Please complete your onboarding process to start accepting payments.
+
+If you need any assistance, our support team is here to help.
+
+Best regards,
+SikaRemit Team
+            """.strip()
+        )
+
+        return Response({
+            'message': 'Merchant account created successfully',
+            'user_id': user.id,
+            'merchant_id': merchant.id
+        })
+
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class StoreViewSet(SubscriptionRequiredMixin, viewsets.ModelViewSet):
     serializer_class = StoreSerializer
@@ -177,3 +555,438 @@ def upload_verification(request):
         onboarding.save()
     
     return Response({'status': 'success'})
+
+class ReportTemplateViewSet(viewsets.ReadOnlyModelViewSet):
+    """API for report templates"""
+    serializer_class = ReportTemplateSerializer
+    permission_classes = [permissions.IsAuthenticated, IsMerchantUser]
+
+    def get_queryset(self):
+        """Return active report templates"""
+        return ReportTemplate.objects.filter(is_active=True)
+
+class ReportViewSet(SubscriptionRequiredMixin, viewsets.ModelViewSet):
+    """API for merchant reports"""
+    serializer_class = ReportSerializer
+    permission_classes = [permissions.IsAuthenticated, IsMerchantUser]
+
+    def get_queryset(self):
+        """Return reports belonging to the current merchant"""
+        return Report.objects.filter(merchant=self.request.user.merchant_profile)
+
+    def perform_create(self, serializer):
+        """Automatically set the merchant when creating a report"""
+        serializer.save(merchant=self.request.user.merchant_profile)
+
+    @action(detail=True, methods=['post'])
+    def regenerate(self, request, pk=None):
+        """Regenerate an existing report"""
+        report = self.get_object()
+        if report.status not in ['completed', 'failed']:
+            return Response({'error': 'Report is still processing'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Reset report status and trigger regeneration
+        report.status = 'pending'
+        report.error_message = ''
+        report.file_url = None
+        report.file_size = None
+        report.record_count = 0
+        report.processing_time = None
+        report.completed_at = None
+        report.save()
+
+        # TODO: Trigger async report generation
+
+        return Response({'message': 'Report regeneration started'})
+
+    @action(detail=True, methods=['post'])
+    def cancel(self, request, pk=None):
+        """Cancel a pending report"""
+        report = self.get_object()
+        if report.status not in ['pending', 'generating']:
+            return Response({'error': 'Report cannot be cancelled'}, status=status.HTTP_400_BAD_REQUEST)
+
+        report.status = 'failed'
+        report.error_message = 'Cancelled by user'
+        report.save()
+
+        return Response({'message': 'Report cancelled'})
+
+    @action(detail=True, methods=['get'])
+    def download(self, request, pk=None):
+        """Download the completed report file"""
+        report = self.get_object()
+        if report.status != 'completed' or not report.file_url:
+            return Response({'error': 'Report is not ready for download'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # In a real implementation, this would serve the file from cloud storage
+        # For now, we'll return a placeholder response
+        return Response({
+            'download_url': report.file_url,
+            'file_size': report.file_size,
+            'file_name': f"{report.name}.{report.format}"
+        })
+
+    @action(detail=False, methods=['get'])
+    def generate(self, request):
+        """Generate a new report with parameters"""
+        template_id = request.query_params.get('template')
+        start_date = request.query_params.get('start_date')
+        end_date = request.query_params.get('end_date')
+        format_type = request.query_params.get('format', 'pdf')
+
+        if not all([template_id, start_date, end_date]):
+            return Response({'error': 'template, start_date, and end_date are required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            template = ReportTemplate.objects.get(id=template_id, is_active=True)
+        except ReportTemplate.DoesNotExist:
+            return Response({'error': 'Invalid template'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Create report
+        report = Report.objects.create(
+            merchant=request.user.merchant_profile,
+            template=template,
+            name=f"{template.name} - {start_date} to {end_date}",
+            start_date=start_date,
+            end_date=end_date,
+            format=format_type,
+            filters=request.query_params.dict()
+        )
+
+        # TODO: Trigger async report generation
+
+        serializer = self.get_serializer(report)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+class ScheduledReportViewSet(SubscriptionRequiredMixin, viewsets.ModelViewSet):
+    """API for scheduled reports"""
+    serializer_class = ScheduledReportSerializer
+    permission_classes = [permissions.IsAuthenticated, IsMerchantUser]
+
+    def get_queryset(self):
+        """Return scheduled reports belonging to the current merchant"""
+        return ScheduledReport.objects.filter(merchant=self.request.user.merchant_profile)
+
+    def perform_create(self, serializer):
+        """Automatically set the merchant and created_by when creating a scheduled report"""
+        serializer.save(
+            merchant=self.request.user.merchant_profile,
+            created_by=self.request.user
+        )
+
+    @action(detail=True, methods=['post'])
+    def pause(self, request, pk=None):
+        """Pause a scheduled report"""
+        scheduled_report = self.get_object()
+        scheduled_report.status = 'paused'
+        scheduled_report.save()
+        return Response({'message': 'Scheduled report paused'})
+
+    @action(detail=True, methods=['post'])
+    def resume(self, request, pk=None):
+        """Resume a paused scheduled report"""
+        scheduled_report = self.get_object()
+        if scheduled_report.status != 'paused':
+            return Response({'error': 'Report is not paused'}, status=status.HTTP_400_BAD_REQUEST)
+
+        scheduled_report.status = 'active'
+        scheduled_report.calculate_next_run()
+        scheduled_report.save()
+        return Response({'message': 'Scheduled report resumed'})
+
+    @action(detail=True, methods=['post'])
+    def run_now(self, request, pk=None):
+        """Trigger immediate execution of a scheduled report"""
+        scheduled_report = self.get_object()
+        if scheduled_report.status != 'active':
+            return Response({'error': 'Scheduled report is not active'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Create a one-time report based on the schedule
+        report = Report.objects.create(
+            merchant=scheduled_report.merchant,
+            template=scheduled_report.template,
+            name=f"{scheduled_report.name} - Manual Run",
+            start_date=timezone.now().date() - timedelta(days=30),  # Last 30 days
+            end_date=timezone.now().date(),
+            format=scheduled_report.format,
+            filters=scheduled_report.filters,
+            is_scheduled=True
+        )
+
+        # Update last_run
+        scheduled_report.last_run = timezone.now()
+        scheduled_report.calculate_next_run()
+        scheduled_report.save()
+
+        # TODO: Trigger async report generation
+
+        serializer = ReportSerializer(report)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+class MerchantCustomerViewSet(viewsets.ModelViewSet):
+    """API for merchant customers"""
+    serializer_class = MerchantCustomerSerializer
+    permission_classes = [IsAuthenticated, IsMerchantUser]
+
+    def get_queryset(self):
+        merchant = self.request.user.merchant_profile
+        return MerchantCustomer.objects.filter(merchant=merchant)
+
+    def get_serializer_class(self):
+        if self.action == 'create':
+            return CreateMerchantCustomerSerializer
+        return MerchantCustomerSerializer
+
+    def perform_create(self, serializer):
+        serializer.save()
+
+    @action(detail=True, methods=['post'])
+    def onboard(self, request, pk=None):
+        """Onboard a customer with optional KYC requirement"""
+        customer = self.get_object()
+        serializer = OnboardMerchantCustomerSerializer(data=request.data)
+        
+        if serializer.is_valid():
+            customer.kyc_required = serializer.validated_data['kyc_required']
+            customer.notes = serializer.validated_data.get('notes', '')
+            customer.status = 'active'
+            customer.save()
+            
+            customer_serializer = self.get_serializer(customer)
+            return Response(customer_serializer.data)
+        
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=['post'])
+    def suspend(self, request, pk=None):
+        """Suspend a customer"""
+        customer = self.get_object()
+        customer.status = 'suspended'
+        customer.save()
+        
+        customer_serializer = self.get_serializer(customer)
+        return Response(customer_serializer.data)
+
+    @action(detail=True, methods=['post'])
+    def activate(self, request, pk=None):
+        """Activate a customer"""
+        customer = self.get_object()
+        customer.status = 'active'
+        customer.save()
+        
+        customer_serializer = self.get_serializer(customer)
+        return Response(customer_serializer.data)
+
+    @action(detail=True, methods=['post'])
+    def submit_kyc(self, request, pk=None):
+        """Submit KYC for a customer"""
+        customer = self.get_object()
+        # TODO: Implement KYC submission logic
+        customer.kyc_status = 'pending'
+        customer.save()
+        
+        customer_serializer = self.get_serializer(customer)
+        return Response(customer_serializer.data)
+
+    @action(detail=False, methods=['get'])
+    def stats(self, request):
+        """Get customer statistics for the merchant"""
+        merchant = request.user.merchant_profile
+        customers = self.get_queryset()
+        
+        stats = {
+            'total_customers': customers.count(),
+            'active_customers': customers.filter(status='active').count(),
+            'suspended_customers': customers.filter(status='suspended').count(),
+            'pending_kyc': customers.filter(kyc_status='pending').count(),
+        }
+        
+        return Response(stats)
+
+class MerchantTransactionViewSet(viewsets.ReadOnlyModelViewSet):
+    """API for merchant transactions"""
+    permission_classes = [IsAuthenticated, IsMerchantUser]
+    
+    def get_queryset(self):
+        merchant = self.request.user.merchant_profile
+        # Get transactions where this merchant is involved
+        return Transaction.objects.filter(
+            Q(sender__merchant_profile=merchant) | Q(receiver__merchant_profile=merchant)
+        ).select_related('sender', 'receiver')
+
+    @action(detail=False, methods=['get'])
+    def stats(self, request):
+        """Get transaction statistics for the merchant"""
+        merchant = request.user.merchant_profile
+        queryset = self.get_queryset()
+        
+        total_transactions = queryset.count()
+        completed = queryset.filter(status='completed').count()
+        failed = queryset.filter(status='failed').count()
+        pending = queryset.filter(status='pending').count()
+        processing = queryset.filter(status='processing').count()
+        
+        total_volume = queryset.filter(status='completed').aggregate(
+            total=Sum('amount')
+        )['total'] or 0
+        
+        success_rate = (completed / total_transactions * 100) if total_transactions > 0 else 0
+        average_transaction = (float(total_volume) / completed) if completed > 0 else 0
+        
+        return Response({
+            'total_volume': float(total_volume),
+            'success_rate': round(success_rate, 1),
+            'average_transaction': round(average_transaction, 2),
+            'processing_count': processing,
+            'total_transactions': total_transactions,
+            'completed_count': completed,
+            'failed_count': failed,
+            'pending_count': pending,
+        })
+
+class MerchantNotificationViewSet(viewsets.ModelViewSet):
+    """API for merchant notifications"""
+    permission_classes = [IsAuthenticated, IsMerchantUser]
+    
+    def get_queryset(self):
+        merchant = self.request.user.merchant_profile
+        # Get notifications for this merchant user
+        return Notification.objects.filter(user=self.request.user)
+
+class MerchantAnalyticsViewSet(viewsets.ViewSet):
+    """API for merchant analytics"""
+    permission_classes = [IsAuthenticated, IsMerchantUser]
+    
+    @action(detail=False, methods=['get'])
+    def overview(self, request):
+        """Get merchant analytics overview"""
+        merchant = request.user.merchant_profile
+        
+        # Calculate analytics
+        total_transactions = Transaction.objects.filter(
+            Q(sender__merchant_profile=merchant) | Q(receiver__merchant_profile=merchant)
+        ).count()
+        
+        total_customers = MerchantCustomer.objects.filter(merchant=merchant).count()
+        active_customers = MerchantCustomer.objects.filter(merchant=merchant, status='active').count()
+        
+        total_revenue = Transaction.objects.filter(
+            receiver__merchant_profile=merchant,
+            status='completed'
+        ).aggregate(total=Sum('amount'))['total'] or 0
+        
+        pending_payouts = 0  # TODO: Calculate from actual payout data
+        
+        analytics = {
+            'total_transactions': total_transactions,
+            'total_customers': total_customers,
+            'active_customers': active_customers,
+            'total_revenue': float(total_revenue),
+            'pending_payouts': pending_payouts,
+            'overview': {
+                'total_revenue': float(total_revenue),
+                'total_transactions': total_transactions,
+                'pending_payouts': pending_payouts,
+            }
+        }
+        
+        return Response(analytics)
+
+class MerchantInvoiceViewSet(viewsets.ModelViewSet):
+    """API for merchant invoices"""
+    permission_classes = [IsAuthenticated, IsMerchantUser]
+    
+    def get_queryset(self):
+        merchant = self.request.user.merchant_profile
+        # Get invoices created by this merchant
+        return Invoice.objects.filter(created_by=self.request.user)
+
+from rest_framework import viewsets, permissions
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from django.shortcuts import get_object_or_404
+
+from core.response import APIResponse
+from .models import MerchantSettings, MerchantNotificationSettings, MerchantPayoutSettings
+from .serializers import (
+    MerchantSettingsSerializer,
+    MerchantNotificationSettingsSerializer,
+    MerchantPayoutSettingsSerializer
+)
+
+
+class MerchantSettingsViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint for managing merchant settings
+    """
+    serializer_class = MerchantSettingsSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return MerchantSettings.objects.filter(merchant=self.request.user.merchant_profile)
+
+    def get_object(self):
+        queryset = self.get_queryset()
+        obj = get_object_or_404(queryset)
+        return obj
+
+    def perform_create(self, serializer):
+        serializer.save(merchant=self.request.user.merchant_profile)
+
+    @action(detail=False, methods=['get', 'patch'])
+    def business(self, request):
+        """Get or update business settings"""
+        settings, created = MerchantSettings.objects.get_or_create(
+            merchant=request.user.merchant_profile,
+            defaults={}
+        )
+
+        if request.method == 'GET':
+            serializer = self.get_serializer(settings)
+            return APIResponse(serializer.data)
+
+        elif request.method == 'PATCH':
+            serializer = self.get_serializer(settings, data=request.data, partial=True)
+            if serializer.is_valid():
+                serializer.save()
+                return APIResponse({"message": "Business settings updated successfully"})
+            return APIResponse(serializer.errors, status=400)
+
+    @action(detail=False, methods=['get', 'patch'])
+    def notifications(self, request):
+        """Get or update notification settings"""
+        settings, created = MerchantNotificationSettings.objects.get_or_create(
+            merchant=request.user.merchant_profile,
+            defaults={}
+        )
+
+        if request.method == 'GET':
+            serializer = MerchantNotificationSettingsSerializer(settings)
+            return APIResponse(serializer.data)
+
+        elif request.method == 'PATCH':
+            serializer = MerchantNotificationSettingsSerializer(settings, data=request.data, partial=True)
+            if serializer.is_valid():
+                serializer.save()
+                return APIResponse({"message": "Notification settings updated successfully"})
+            return APIResponse(serializer.errors, status=400)
+
+    @action(detail=False, methods=['get', 'patch'])
+    def payouts(self, request):
+        """Get or update payout settings"""
+        settings, created = MerchantPayoutSettings.objects.get_or_create(
+            merchant=request.user.merchant_profile,
+            defaults={}
+        )
+
+        if request.method == 'GET':
+            serializer = MerchantPayoutSettingsSerializer(settings)
+            return APIResponse(serializer.data)
+
+        elif request.method == 'PATCH':
+            serializer = MerchantPayoutSettingsSerializer(settings, data=request.data, partial=True)
+            if serializer.is_valid():
+                serializer.save()
+                return APIResponse({"message": "Payout settings updated successfully"})
+            return APIResponse(serializer.errors, status=400)

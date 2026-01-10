@@ -1,12 +1,16 @@
-/// <reference types="cypress" />
-
-declare namespace Cypress {
-  interface Chainable {
-    loginAsAdmin(): Chainable<void>
-    loginAsMerchant(): Chainable<void>
-    loginAsCustomer(): Chainable<void>
+declare global {
+  namespace Cypress {
+    interface Chainable {
+      loginAsAdmin(): Chainable
+      loginAsMerchant(): Chainable
+      loginAsCustomer(): Chainable
+    }
   }
 }
+
+/// <reference types="cypress" />
+import 'cypress'
+import { expect } from 'chai'
 
 Cypress.Commands.add('loginAsAdmin', () => {
   cy.session('admin', () => {
@@ -14,13 +18,13 @@ Cypress.Commands.add('loginAsAdmin', () => {
       method: 'POST',
       url: 'http://localhost:8000/api/v1/accounts/login/',
       body: {
-        email: 'admin@payglobe.com',
+        email: 'admin@sikaremit.com',
         password: Cypress.env('ADMIN_PASSWORD') || 'admin123'
       },
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded'
       }
-    }).then((response: Cypress.Response<any>) => {
+    }).then((response: any) => {
       expect(response.status).to.eq(200)
       expect(response.body).to.have.property('access')
       expect(response.body).to.have.property('user')
@@ -47,7 +51,7 @@ Cypress.Commands.add('loginAsMerchant', () => {
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded'
       }
-    }).then((response: Cypress.Response<any>) => {
+    }).then((response: any) => {
       expect(response.status).to.eq(200)
       expect(response.body).to.have.property('access')
       expect(response.body).to.have.property('user')
@@ -72,7 +76,7 @@ Cypress.Commands.add('loginAsCustomer', () => {
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded'
       }
-    }).then((response: Cypress.Response<any>) => {
+    }).then((response: any) => {
       expect(response.status).to.eq(200)
       expect(response.body).to.have.property('access')
       expect(response.body).to.have.property('user')

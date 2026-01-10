@@ -1,9 +1,11 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import permissions, status
+from rest_framework import viewsets
 from django.contrib.auth import get_user_model, login
-from accounts.models import UserActivity
-from .serializers import UserActivitySerializer
+from accounts.models import UserActivity, Payout, Recipient
+from .serializers import UserActivitySerializer, UserSerializer, AdminUserSerializer
+from accounts.serializers import RecipientSerializer
 from rest_framework.decorators import action
 from django.contrib import admin
 from django.http import HttpResponse
@@ -110,30 +112,34 @@ class ExportAPIView(APIView):
         if status_filter:
             users = users.filter(is_active=status_filter.lower() == 'active')
         if role_filter:
-            users = users.filter(role=role_filter.lower())
+            # Map role names to user_type values
+            role_map = {'admin': 1, 'merchant': 2, 'customer': 3}
+            user_type_val = role_map.get(role_filter.lower())
+            if user_type_val:
+                users = users.filter(user_type=user_type_val)
         
         if format == 'json':
             response = HttpResponse(content_type='application/json')
             response['Content-Disposition'] = 'attachment; filename="users.json"'
-            response.write(json.dumps(list(users.values('id', 'email', 'first_name', 'last_name', 'role', 'is_active')), indent=2))
+            response.write(json.dumps(list(users.values('id', 'email', 'first_name', 'last_name', 'user_type', 'is_active')), indent=2))
             return response
         elif format == 'excel':
             response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
             response['Content-Disposition'] = 'attachment; filename="users.xlsx"'
             workbook = Workbook()
             worksheet = workbook.active
-            worksheet.append(['ID', 'Email', 'First Name', 'Last Name', 'Role', 'Is Active'])
+            worksheet.append(['ID', 'Email', 'First Name', 'Last Name', 'User Type', 'Is Active'])
             for user in users:
-                worksheet.append([user.id, user.email, user.first_name, user.last_name, user.role, user.is_active])
+                worksheet.append([user.id, user.email, user.first_name, user.last_name, user.user_type, user.is_active])
             workbook.save(response)
             return response
         else:  # CSV
             response = HttpResponse(content_type='text/csv')
             response['Content-Disposition'] = 'attachment; filename="users.csv"'
             writer = csv.writer(response)
-            writer.writerow(['ID', 'Email', 'First Name', 'Last Name', 'Role', 'Is Active'])
+            writer.writerow(['ID', 'Email', 'First Name', 'Last Name', 'User Type', 'Is Active'])
             for user in users:
-                writer.writerow([user.id, user.email, user.first_name, user.last_name, user.role, user.is_active])
+                writer.writerow([user.id, user.email, user.first_name, user.last_name, user.user_type, user.is_active])
             return response
     
     @action(detail=False, methods=['get'])
@@ -179,7 +185,11 @@ class UserSearchAPIView(APIView):
             )
             
         if role:
-            users = users.filter(role=role)
+            # Map role names to user_type values
+            role_map = {'admin': 1, 'merchant': 2, 'customer': 3}
+            user_type_val = role_map.get(role.lower())
+            if user_type_val:
+                users = users.filter(user_type=user_type_val)
             
         if is_active:
             users = users.filter(is_active=is_active.lower() == 'true')
@@ -227,7 +237,7 @@ class MerchantMetricsAPIView(APIView):
     """
     API endpoint for merchant analytics and metrics
     """
-    permission_classes = [permissions.IsAdminUser]
+    permission_classes = [permissions.IsAuthenticated]  # Allow authenticated merchants
     
     def get(self, request):
         from django.db.models import Count, Sum
@@ -238,13 +248,13 @@ class MerchantMetricsAPIView(APIView):
         date_from = datetime.now() - timedelta(days=days)
         
         metrics = {
-            'total_merchants': User.objects.filter(role='merchant').count(),
+            'total_merchants': User.objects.filter(user_type=2).count(),
             'active_merchants': User.objects.filter(
-                role='merchant', 
+                user_type=2, 
                 last_login__gte=date_from
             ).count(),
             'new_merchants': User.objects.filter(
-                role='merchant',
+                user_type=2,
                 date_joined__gte=date_from
             ).count(),
             'pending_payouts': Payout.objects.filter(status='pending').count(),
@@ -264,7 +274,7 @@ class MerchantVerificationAPIView(APIView):
     
     def post(self, request, merchant_id):
         try:
-            merchant = User.objects.get(pk=merchant_id, role='merchant')
+            merchant = User.objects.get(pk=merchant_id, user_type=2)
             merchant.is_verified = True
             merchant.save()
             
@@ -304,14 +314,18 @@ class AdminUserSearchView(APIView):
             )
 
         if role:
-            users = users.filter(user_type=role)
+            # Map string roles to integer user_type values
+            role_mapping = {'user': 3, 'merchant': 2, 'admin': 1}
+            user_type_value = role_mapping.get(role.lower())
+            if user_type_value:
+                users = users.filter(user_type=user_type_value)
 
         if is_active:
             users = users.filter(is_active=is_active.lower() == 'true')
 
         users = users.order_by('-date_joined')[:100]
 
-        serializer = UserActivitySerializer(users, many=True)
+        serializer = UserSerializer(users, many=True)
         return Response(serializer.data)
 
 class AdminUserBulkUpdateView(APIView):
@@ -354,7 +368,7 @@ class AdminUserDetailView(APIView):
     def get(self, request, user_id):
         try:
             user = User.objects.get(id=user_id)
-            serializer = UserActivitySerializer(user)
+            serializer = UserSerializer(user)
             return Response(serializer.data)
         except User.DoesNotExist:
             return Response(
@@ -379,7 +393,7 @@ class AdminUserDetailView(APIView):
                     metadata={'is_active': is_active}
                 )
 
-            serializer = UserActivitySerializer(user)
+            serializer = UserSerializer(user)
             return Response(serializer.data)
         except User.DoesNotExist:
             return Response(
@@ -394,11 +408,12 @@ class AdminVerificationListView(APIView):
     permission_classes = [permissions.IsAdminUser]
 
     def get(self, request):
+        from ..api.serializers import UserSerializer
         pending_users = User.objects.filter(
-            verification_status='pending'
+            is_verified=False
         ).order_by('date_joined')
 
-        serializer = UserActivitySerializer(pending_users, many=True)
+        serializer = UserSerializer(pending_users, many=True)
         return Response(serializer.data)
 
 class AdminVerificationActionView(APIView):
@@ -412,11 +427,12 @@ class AdminVerificationActionView(APIView):
             user = User.objects.get(id=verification_id)
 
             if action == 'approve':
-                user.verification_status = 'approved'
                 user.is_verified = True
+                user.verification_level = 3
                 action_type = 'VERIFICATION_APPROVED'
             elif action == 'reject':
-                user.verification_status = 'rejected'
+                user.is_verified = False
+                user.verification_level = 0
                 reason = request.data.get('reason', '')
                 action_type = 'VERIFICATION_REJECTED'
             else:
@@ -490,3 +506,141 @@ class AdminExportView(APIView):
         # Default JSON response
         serializer = UserActivitySerializer(users, many=True)
         return Response(serializer.data)
+
+class AdminUserViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for admin user management operations.
+    Allows admins to create, read, update, delete, and search users.
+    """
+    serializer_class = AdminUserSerializer
+    permission_classes = [permissions.IsAdminUser]
+    queryset = User.objects.all().order_by('-date_joined')
+    
+    def get_queryset(self):
+        queryset = User.objects.all().order_by('-date_joined')
+        search = self.request.query_params.get('search', None)
+        if search:
+            queryset = queryset.filter(
+                Q(email__icontains=search) | 
+                Q(first_name__icontains=search) | 
+                Q(last_name__icontains=search)
+            )
+        return queryset
+    
+    def create(self, request, *args, **kwargs):
+        print(f"DEBUG CREATE: Received data: {request.data}")
+        
+        # Handle password separately in serializer
+        serializer = self.get_serializer(data=request.data)
+        print(f"DEBUG CREATE: Serializer initialized")
+        
+        try:
+            serializer.is_valid(raise_exception=True)
+            print(f"DEBUG CREATE: Validation passed")
+        except Exception as e:
+            print(f"DEBUG CREATE: Validation failed: {e}")
+            print(f"DEBUG CREATE: Serializer errors: {serializer.errors}")
+            raise
+        
+        try:
+            user = serializer.save()
+            print(f"DEBUG CREATE: User created successfully: {user.email}")
+        except Exception as e:
+            print(f"DEBUG CREATE: User save failed: {e}")
+            raise
+        
+        # Log admin action
+        log_audit_action(
+            'USER_CREATE',
+            request.user,
+            user=user,  # The admin performing the action
+            metadata={
+                'affected_user_id': user.id,
+                'affected_user_email': user.email,
+                'user_type': user.user_type
+            }
+        )
+        
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+    
+    def partial_update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save()
+        
+        # Log admin action
+        action_type = 'USER_UPDATE'
+        if 'is_active' in request.data:
+            action_type = 'USER_ACTIVATE' if user.is_active else 'USER_DEACTIVATE'
+        
+        try:
+            log_audit_action(
+                action_type,
+                request.user,
+                user=request.user,  # The admin performing the action
+                metadata={
+                    'affected_user_id': user.id,
+                    'affected_user_email': user.email,
+                    'changes': list(request.data.keys()),
+                    'new_status': user.is_active if 'is_active' in request.data else None
+                }
+            )
+        except Exception as e:
+            # Log the error but don't fail the update
+            print(f"Warning: Failed to log audit action: {e}")
+        
+        return Response(serializer.data)
+    
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        
+        # Log admin action
+        try:
+            log_audit_action(
+                'USER_DELETE',
+                request.user,
+                user=request.user,  # The admin performing the action
+                metadata={
+                    'affected_user_id': instance.id,
+                    'affected_user_email': instance.email,
+                    'user_type': instance.user_type
+                }
+            )
+        except Exception as e:
+            # Log the error but don't fail the deletion
+            print(f"Warning: Failed to log audit action: {e}")
+        
+        try:
+            self.perform_destroy(instance)
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        except Exception as e:
+            # Detailed error logging
+            import traceback
+            error_msg = str(e)
+            print(f"DELETE ERROR for user {instance.email} (ID: {instance.id}): {error_msg}")
+            print("Full traceback:")
+            traceback.print_exc()
+            
+            # Check for specific database errors
+            if 'feeconfiguration' in error_msg.lower():
+                return Response(
+                    {'error': 'Cannot delete user due to existing fee configurations. Please contact system administrator.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            elif 'foreign key' in error_msg.lower() or 'constraint' in error_msg.lower():
+                return Response(
+                    {'error': 'Cannot delete user due to existing relationships. Please contact system administrator.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            else:
+                # Re-raise other errors for debugging
+                raise
+
+class RecipientViewSet(viewsets.ReadOnlyModelViewSet):
+    serializer_class = RecipientSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return Recipient.objects.filter(user=self.request.user)

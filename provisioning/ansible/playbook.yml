@@ -1,8 +1,8 @@
 ---
-- name: Configure PayGlobe Monitoring
+- name: Configure SikaRemit Monitoring
   hosts: all
   vars:
-    backup_dir: /opt/payglobe/config_backups
+    backup_dir: /opt/sikaremit/config_backups
   tasks:
     - name: Ensure backup directory exists
       file:
@@ -19,12 +19,12 @@
     - name: Deploy backup scripts
       copy:
         src: "../../scripts/"
-        dest: "/opt/payglobe/scripts"
+        dest: "/opt/sikaremit/scripts"
         mode: '0755'
 
     - name: Schedule backups
       cron:
-        name: "PayGlobe config backup"
+        name: "SikaRemit config backup"
         minute: "0"
         hour: "2"
-        job: "cd /opt/payglobe && ./scripts/backup_config.sh"
+        job: "cd /opt/sikaremit && ./scripts/backup_config.sh"

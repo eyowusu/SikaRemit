@@ -8,7 +8,8 @@ import { Label } from '@/components/ui/label'
 import { register } from '@/lib/api/auth'
 import { useToast } from '@/hooks/use-toast'
 
-export function RegisterForm() {
+export function RegisterForm({ userType = 'customer' }: { userType?: 'customer' | 'merchant' }) {
+
   const [formData, setFormData] = React.useState({
     email: '',
     password: '',
@@ -16,7 +17,7 @@ export function RegisterForm() {
     firstName: '',
     lastName: '',
     phone: '',
-    userType: 3 // Default to customer
+    userType: 3 // Always customer for this form
   })
   const [isLoading, setIsLoading] = React.useState(false)
   const { toast } = useToast()
@@ -53,9 +54,33 @@ export function RegisterForm() {
       
       router.push('/auth?verified=check')
     } catch (error: any) {
+      let errorMessage = 'Registration failed'
+      
+      if (error.response?.data) {
+        // Handle Django REST framework validation errors
+        if (typeof error.response.data === 'object') {
+          const errors = error.response.data
+          if (errors.email) {
+            errorMessage = Array.isArray(errors.email) ? errors.email[0] : errors.email
+          } else if (errors.password) {
+            errorMessage = Array.isArray(errors.password) ? errors.password[0] : errors.password
+          } else if (errors.non_field_errors) {
+            errorMessage = Array.isArray(errors.non_field_errors) ? errors.non_field_errors[0] : errors.non_field_errors
+          } else {
+            // Get first error from any field
+            const firstError = Object.values(errors)[0]
+            errorMessage = Array.isArray(firstError) ? firstError[0] : firstError
+          }
+        } else if (typeof error.response.data === 'string') {
+          errorMessage = error.response.data
+        }
+      } else if (error.message) {
+        errorMessage = error.message
+      }
+      
       toast({
         title: 'Error',
-        description: error.message || 'Registration failed',
+        description: errorMessage,
         variant: 'destructive'
       })
     } finally {
@@ -122,32 +147,6 @@ export function RegisterForm() {
           onChange={handleChange}
           placeholder="+1234567890"
         />
-      </div>
-
-      <div>
-        <Label>Account Type</Label>
-        <div className="flex gap-6 mt-2">
-          <label className="flex items-center gap-2">
-            <input
-              type="radio"
-              name="userType"
-              value="3"
-              checked={formData.userType === 3}
-              onChange={(e) => setFormData(prev => ({ ...prev, userType: parseInt(e.target.value) }))}
-            />
-            <span>Customer</span>
-          </label>
-          <label className="flex items-center gap-2">
-            <input
-              type="radio"
-              name="userType"
-              value="2"
-              checked={formData.userType === 2}
-              onChange={(e) => setFormData(prev => ({ ...prev, userType: parseInt(e.target.value) }))}
-            />
-            <span>Merchant</span>
-          </label>
-        </div>
       </div>
 
       <div>

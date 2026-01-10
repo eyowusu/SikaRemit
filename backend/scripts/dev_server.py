@@ -24,7 +24,7 @@ def run_server():
         print("Starting Django development server...")
         try:
             process = subprocess.Popen([
-                sys.executable, '../manage.py', 'runserver', '8000', '--noreload'
+                sys.executable.replace('python.exe', '../venv/Scripts/python.exe'), '../manage.py', 'runserver', '8000', '--noreload'
             ], cwd=Path(__file__).parent)
 
             # Wait for the process to finish

@@ -1,145 +1,91 @@
 'use client'
 
 import * as React from 'react'
-import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { signIn, getSession } from 'next-auth/react'
+import { useAuth } from '@/lib/auth/context'
+import { useRouter } from 'next/navigation'
 import { useToast } from '@/hooks/use-toast'
-import { TwoFactorAuth } from './two-factor'
-import type { AuthSessionType } from '@/lib/types/auth';
-import { useSearchParams } from 'next/navigation'
-import { useEffect } from 'react';
 
-export function LoginForm() {
+export function LoginForm({ userType = 'customer' }: { userType?: 'customer' | 'merchant' | 'admin' }) {
   const [email, setEmail] = React.useState('')
   const [password, setPassword] = React.useState('')
-  const [session, setSession] = React.useState<AuthSessionType | null>(null)
-  const [isLoading, setIsLoading] = React.useState(false)
-  const [loginAttempts, setLoginAttempts] = React.useState(0);
-  const [lastAttemptTime, setLastAttemptTime] = React.useState<number | null>(null);
-  const { toast } = useToast()
+  const [isLoggingIn, setIsLoggingIn] = React.useState(false)
+  const { login } = useAuth()
   const router = useRouter()
-  const searchParams = useSearchParams()
-  const error = searchParams.get('error')
-
-  useEffect(() => {
-    const checkSession = () => {
-      if (session?.expires && Date.now() > new Date(session.expires).getTime()) {
-        router.push('/login?session_expired=1');
-      }
-    };
-    const interval = setInterval(checkSession, 60000);
-    return () => clearInterval(interval);
-  }, [session, router]);
-
-  useEffect(() => {
-    let inactivityTimer: NodeJS.Timeout;
-    
-    const resetTimer = () => {
-      clearTimeout(inactivityTimer);
-      inactivityTimer = setTimeout(() => {
-        router.push('/login?session_expired=1');
-      }, 30 * 60 * 1000); // 30 minutes
-    };
-
-    // Add event listeners
-    window.addEventListener('mousemove', resetTimer);
-    window.addEventListener('keydown', resetTimer);
-    window.addEventListener('scroll', resetTimer);
-    resetTimer();
-
-    // Cleanup
-    return () => {
-      clearTimeout(inactivityTimer);
-      window.removeEventListener('mousemove', resetTimer);
-      window.removeEventListener('keydown', resetTimer);
-      window.removeEventListener('scroll', resetTimer);
-    };
-  }, [router]);
-
-  const roleRedirects = {
-    admin: '/admin/dashboard',
-    merchant: '/merchant/dashboard',
-    customer: '/account'
-  };
+  const { toast } = useToast()
 
   const handleLogin = async () => {
-    setIsLoading(true);
-    
-    try {
-      const result = await signIn('django', {
-        email,
-        password,
-        redirect: false
-      });
+    console.log('🚀 LoginForm: handleLogin started')
+    console.log('🚀 LoginForm: Current location:', window.location.href)
+    console.log('🚀 LoginForm: Email:', email, 'Password length:', password.length)
 
-      if (result?.error) {
-        setLoginAttempts(prev => prev + 1);
-        toast({
-          title: 'Error',
-          description: 'Invalid credentials',
-          variant: 'destructive'
-        });
-        return;
-      }
-
-      // Success - redirect based on user role
-      const session = await getSession();
-      
-      if (session?.user?.role) {
-        const roleRedirects = {
-          admin: '/admin/dashboard',
-          merchant: '/merchant/dashboard',
-          customer: '/account'
-        };
-        const redirectPath = roleRedirects[session.user.role as keyof typeof roleRedirects] || '/account';
-        router.push(redirectPath);
-      } else {
-        // If no role is found, redirect to a default page
-        router.push('/account');
-      }
-
-    } catch (error) {
-      setLoginAttempts(prev => prev + 1);
+    if (!email || !password) {
+      console.log('⚠️ LoginForm: Missing email or password')
       toast({
         title: 'Error',
-        description: 'Login failed',
+        description: 'Please enter both email and password',
         variant: 'destructive'
-      });
-    } finally {
-      setIsLoading(false);
+      })
+      return
     }
-  }
 
-  if (session) {
-    return (
-      <TwoFactorAuth 
-        userId={session.user.id}
-        phone={session.user.phone || ''}
-        onSuccess={() => router.push('/dashboard')}
-      />
-    )
+    console.log('🔐 LoginForm: Calling auth context login...')
+    setIsLoggingIn(true)
+    try {
+      console.log('🔐 LoginForm: About to call login function')
+      const role = await login(email, password)
+      console.log('✅ LoginForm: Login successful, role returned:', role)
+      console.log('✅ LoginForm: Role type:', typeof role)
+      console.log('✅ LoginForm: Role value:', JSON.stringify(role))
+
+      toast({
+        title: 'Login Successful',
+        description: 'Redirecting to dashboard...',
+      })
+      
+      // Handle redirect based on role
+      const redirectPath = {
+        admin: '/admin/overview',
+        merchant: '/merchant/dashboard',
+        customer: '/customer/dashboard'
+      }[role] || '/customer/dashboard'
+      
+      console.log('🔄 LoginForm: Role mapping result:', redirectPath)
+      console.log('🔄 LoginForm: About to redirect to:', redirectPath)
+      console.log('🔄 LoginForm: Current pathname:', window.location.pathname)
+      
+      // Use Next.js router for reliable navigation
+      console.log('🔄 LoginForm: Calling window.location.href with:', redirectPath)
+      window.location.href = redirectPath
+      
+      console.log('✅ LoginForm: Router navigation initiated')
+      console.log('✅ LoginForm: Navigation should be complete')
+    } catch (error: any) {
+      console.error('❌ LoginForm: Login failed:', error)
+      console.error('❌ LoginForm: Error details:', error.response?.data, error.message)
+      const errorMessage = error.response?.data?.error ||
+                           error.response?.data?.non_field_errors?.[0] ||
+                           error.response?.data?.detail ||
+                           error.message ||
+                           'Invalid credentials';
+      console.error('❌ LoginForm: Error message:', errorMessage)
+      toast({
+        title: 'Login Failed',
+        description: errorMessage,
+        variant: 'destructive'
+      })
+      // IMPORTANT: Do NOT redirect on login failure - stay on current page
+      // This ensures admin login failures stay on admin portal, not customer/merchant pages
+    } finally {
+      console.log('🔄 LoginForm: Setting isLoggingIn to false')
+      setIsLoggingIn(false)
+    }
   }
 
   return (
     <div className="space-y-4">
-      {error === 'insufficient_permissions' && (
-        <div className="text-destructive text-sm p-2 bg-destructive/10 rounded">
-          Insufficient permissions
-        </div>
-      )}
-      {error === 'not_logged_in' && (
-        <div className="text-destructive text-sm p-2 bg-destructive/10 rounded">
-          Please log in first
-        </div>
-      )}
-      {searchParams.get('session_expired') === '1' && (
-        <div className="text-orange-600 text-sm p-2 bg-orange-50 border border-orange-200 rounded dark:text-orange-400 dark:bg-orange-950 dark:border-orange-800">
-          Your session has expired. Please log in again.
-        </div>
-      )}
       <div className="space-y-2">
         <Label htmlFor="email">Email</Label>
         <Input
@@ -147,9 +93,10 @@ export function LoginForm() {
           type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
+          placeholder="Enter your email"
         />
       </div>
-      
+
       <div className="space-y-2">
         <Label htmlFor="password">Password</Label>
         <Input
@@ -157,16 +104,18 @@ export function LoginForm() {
           type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
+          placeholder="Enter your password"
         />
       </div>
-      
-      <Button 
+
+      <Button
         onClick={handleLogin}
-        disabled={isLoading || !email || !password}
+        disabled={isLoggingIn || !email || !password}
         className="w-full"
       >
-        {isLoading ? 'Logging in...' : 'Login'}
+        {isLoggingIn ? 'Logging in...' : 'Login'}
       </Button>
+
     </div>
   )
 }

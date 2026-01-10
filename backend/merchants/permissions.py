@@ -1,5 +1,5 @@
 from rest_framework import permissions
-from payments.models.subscription import Subscription
+from payments.models.subscriptions import Subscription
 from django.utils import timezone
 
 class HasActiveSubscription(permissions.BasePermission):

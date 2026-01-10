@@ -47,7 +47,7 @@ export function usePayment(merchantContext: PaymentContext, limits?: MerchantPay
       merchantId,
       defaultPayoutMethod: context.defaultPayoutMethod || '',
       businessName,
-      allowedPaymentMethods: limits?.allowedMethods.map(method => ({
+      allowedPaymentMethods: limits?.allowedMethods?.map(method => ({
         id: method,
         type: method.startsWith('card_') ? 'card' : 
               method.startsWith('bank_') ? 'bank_transfer' : 'mobile_money',
@@ -62,8 +62,8 @@ export function usePayment(merchantContext: PaymentContext, limits?: MerchantPay
     }
     
     if (limits) {
-      if (amount > limits.maxAmount) {
-        throw new Error(`Amount exceeds maximum limit of ${limits.maxAmount} ${limits.currency}`)
+      if (amount > limits.per_transaction_limit) {
+        throw new Error(`Amount exceeds maximum limit of ${limits.per_transaction_limit} ${limits.currency}`)
       }
       
       const methodValid = context.allowedPaymentMethods.some(m => m.id === methodId)
@@ -96,38 +96,27 @@ export function usePayment(merchantContext: PaymentContext, limits?: MerchantPay
       switch (type) {
         case 'subscription':
           if (!data.planId) throw new Error('planId is required for subscriptions')
-          response = await upgradeSubscription({
-            planId: data.planId,
-            paymentMethodId: data.paymentMethodId,
-            couponCode: data.couponCode
-          } as SubscriptionUpgradeRequest)
+          response = await upgradeSubscription(data.planId, data.paymentMethodId)
           break
         case 'remittance':
           if (!data.recipientName || !data.recipientPhone || !data.recipientCountry || !data.amount) {
             throw new Error('Missing required remittance fields')
           }
           response = await sendRemittance({
-            recipientName: data.recipientName,
-            recipientPhone: data.recipientPhone,
-            recipientCountry: data.recipientCountry,
+            recipient: data.recipientPhone || data.recipientName,
+            recipient_name: data.recipientName,
+            recipient_country: data.recipientCountry,
             amount: data.amount,
             currency: data.currency,
-            paymentMethodId: data.paymentMethodId,
-            reference: data.reference
-          } as RemittancePaymentRequest)
+            payment_method_id: data.paymentMethodId,
+            purpose: data.reference
+          })
           break
         case 'bill':
-          if (!data.billIssuer || !data.billReference || !data.dueDate || !data.amount) {
+          if (!data.billReference || !data.amount) {
             throw new Error('Missing required bill payment fields')
           }
-          response = await payBill({
-            billIssuer: data.billIssuer,
-            billReference: data.billReference,
-            dueDate: data.dueDate,
-            amount: data.amount,
-            paymentMethodId: data.paymentMethodId,
-            billType: data.billType
-          } as BillPaymentRequest)
+          response = await payBill(data.billReference, data.paymentMethodId)
           break
         default:
           throw new Error('Invalid payment type')

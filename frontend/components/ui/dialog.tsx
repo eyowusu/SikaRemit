@@ -17,9 +17,11 @@ const DialogContent = React.forwardRef<
         'fixed left-[50%] top-[50%] z-50 w-full max-w-md translate-x-[-50%] translate-y-[-50%] bg-white p-6 shadow-lg',
         className
       )}
+      aria-describedby="dialog-description"
       {...props}
     >
       {children}
+      <div id="dialog-description" className="sr-only">Dialog content</div>
     </DialogPrimitive.Content>
   </DialogPrimitive.Portal>
 ))
@@ -66,4 +68,18 @@ const DialogDescription = React.forwardRef<
 ))
 DialogDescription.displayName = DialogPrimitive.Description.displayName
 
-export { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription }
+const DialogFooter = ({
+  className,
+  ...props
+}: React.HTMLAttributes<HTMLDivElement>) => (
+  <div
+    className={cn(
+      'flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2',
+      className
+    )}
+    {...props}
+  />
+)
+DialogFooter.displayName = 'DialogFooter'
+
+export { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter }

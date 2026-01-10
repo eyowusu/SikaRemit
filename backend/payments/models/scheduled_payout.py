@@ -15,7 +15,7 @@ class ScheduledPayout(models.Model):
         (COMPLETED, 'Completed'),
     ]
 
-    merchant = models.ForeignKey('Merchant', on_delete=models.CASCADE)
+    merchant = models.ForeignKey('users.Merchant', on_delete=models.CASCADE)
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     schedule = models.CharField(max_length=100)  # cron expression
     next_execution = models.DateTimeField()

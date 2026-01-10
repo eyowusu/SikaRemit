@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label'
 import { forgotPassword } from '@/lib/api/auth'
 import { useToast } from '@/hooks/use-toast'
 
-export function ForgotPasswordForm() {
+export function ForgotPasswordForm({ userType = 'customer' }: { userType?: 'customer' | 'merchant' | 'admin' }) {
   const [email, setEmail] = React.useState('')
   const [isLoading, setIsLoading] = React.useState(false)
   const [isSubmitted, setIsSubmitted] = React.useState(false)

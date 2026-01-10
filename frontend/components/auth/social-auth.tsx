@@ -1,22 +1,32 @@
 'use client'
 
-import { signIn } from 'next-auth/react'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/hooks/use-toast'
+import { useRouter } from 'next/navigation'
+import { useAuth } from '@/lib/auth/context'
+
+const SCOPE = 'openid email profile'
+const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID
+const REDIRECT_URI = typeof window !== 'undefined' ? `${window.location.origin}/auth/callback/google` : ''
 
 export function SocialAuth() {
+  const { login } = useAuth()
+  const router = useRouter()
   const { toast } = useToast()
 
   const handleGoogleSignIn = async () => {
     try {
-      await signIn('google', {
-        callbackUrl: '/',
-        redirect: false
-      })
+      const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
+        `client_id=${GOOGLE_CLIENT_ID}&` +
+        `redirect_uri=${REDIRECT_URI}&` +
+        `response_type=code&` +
+        `scope=${SCOPE}`
+
+      router.push(authUrl)
     } catch (error) {
       toast({
-        title: 'Error',
-        description: 'Failed to sign in with Google',
+        title: 'Authentication Error',
+        description: 'An error occurred during authentication',
         variant: 'destructive'
       })
     }

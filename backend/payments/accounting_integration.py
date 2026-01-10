@@ -1,7 +1,6 @@
 from django.conf import settings
 import requests
 import logging
-from .models.payment import Payment
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
@@ -18,7 +17,10 @@ class AccountingSystem:
     def sync_payment(self, payment):
         """Sync a single payment to accounting system"""
         try:
-            if self.config['system'] == 'quickbooks':
+            if self.config.get('system') == 'disabled':
+                # Skip syncing for tests or when disabled
+                return True
+            elif self.config['system'] == 'quickbooks':
                 return self._sync_to_quickbooks(payment)
             elif self.config['system'] == 'xero':
                 return self._sync_to_xero(payment)

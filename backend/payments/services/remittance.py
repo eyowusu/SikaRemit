@@ -85,6 +85,21 @@ class RemittanceService(BasePaymentService):
             raise
     
     def _get_exchange_rate(self, source_currency, target_currency):
-        """Get current exchange rate (would integrate with FX provider)"""
-        # Placeholder - would call FX API in production
-        return Decimal('1.0')
+        """Get current exchange rate from admin-set database rates"""
+        from payments.models import ExchangeRate
+        
+        if source_currency == target_currency:
+            return Decimal('1.0')
+        
+        # Get rate from database (set by admin)
+        rate = ExchangeRate.get_current_rate(source_currency, target_currency)
+        if rate:
+            return Decimal(str(rate.rate))
+        
+        # Try inverse rate
+        inverse_rate = ExchangeRate.get_current_rate(target_currency, source_currency)
+        if inverse_rate and inverse_rate.rate > 0:
+            return Decimal('1') / Decimal(str(inverse_rate.rate))
+        
+        # No fallback - admin must set rates
+        raise ValueError(f"Exchange rate not configured for {source_currency} to {target_currency}. Please contact admin.")

@@ -1,0 +1,64 @@
+import axios from 'axios'
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+
+function getAuthHeaders() {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null
+  return token ? { Authorization: `Bearer ${token}` } : {}
+}
+
+export interface AnalyticsData {
+  revenue: {
+    total: number
+    change_percentage: number
+    chart_data: Array<{ date: string; amount: number }>
+  }
+  transactions: {
+    total: number
+    change_percentage: number
+  }
+  customers: {
+    total: number
+    change_percentage: number
+  }
+  sales: {
+    total: number
+    change_percentage: number
+    by_category: Array<{ category: string; amount: number }>
+  }
+}
+
+export async function getAnalytics(params?: {
+  start_date?: string
+  end_date?: string
+  store_id?: string
+}) {
+  const response = await axios.get(`${API_BASE_URL}/api/merchant/analytics/`, {
+    headers: getAuthHeaders(),
+    params
+  })
+  return response.data
+}
+
+export async function getRevenueChart(params?: {
+  start_date?: string
+  end_date?: string
+  interval?: 'day' | 'week' | 'month'
+}) {
+  const response = await axios.get(`${API_BASE_URL}/api/merchant/analytics/revenue/`, {
+    headers: getAuthHeaders(),
+    params
+  })
+  return response.data
+}
+
+export async function getSalesMetrics(params?: {
+  start_date?: string
+  end_date?: string
+}) {
+  const response = await axios.get(`${API_BASE_URL}/api/merchant/analytics/sales/`, {
+    headers: getAuthHeaders(),
+    params
+  })
+  return response.data
+}

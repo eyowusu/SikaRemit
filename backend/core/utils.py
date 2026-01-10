@@ -10,7 +10,7 @@ def verify_webhooks():
         try:
             response = requests.post(
                 settings.SLACK_WEBHOOK_URL,
-                json={'text': 'PayGlobe webhook test'}
+                json={'text': 'SikaRemit webhook test'}
             )
             results['slack'] = response.status_code == 200
         except Exception as e:

@@ -10,7 +10,7 @@ from .models import KYCDocument
 @shared_task
 def send_verification_email(user_id):
     user = User.objects.get(pk=user_id)
-    subject = "Verify your PayGlobe account"
+    subject = "Verify your SikaRemit account"
     message = render_to_string('users/verification_email.html', {
         'user': user,
         'verification_url': f"{settings.FRONTEND_URL}/verify-email/{user.verification_token}/"

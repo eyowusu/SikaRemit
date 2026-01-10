@@ -1,107 +1,130 @@
 'use client'
 
-import * as React from 'react'
-import { ColumnDef } from '@tanstack/react-table'
-import { DataTable } from '@/components/ui/data-table'
-import { createPayout } from '@/lib/api/merchant'
-import { useToast } from '@/hooks/use-toast'
+import { useState } from 'react'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { RefreshCw, Check, X, Eye } from 'lucide-react'
 import type { Payout } from '@/lib/types/payout'
 import type { Merchant } from '@/lib/types/merchant'
-import { formatCurrency } from '@/lib/utils/currency'
-import { usePayoutWebhooks } from '@/hooks/useWebhooks'
-import { Mail, Phone } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { getPayouts } from '@/lib/api/payouts'
 
-interface InstantPayoutTableProps {
-  payouts?: Payout[]
-  merchants?: Merchant[]
-  onRefresh?: () => void
+interface PayoutsTableProps {
+  payouts: Payout[]
+  merchants: Merchant[]
+  onRefresh: () => void
 }
 
-export function PayoutsTable({ payouts, merchants, onRefresh }: InstantPayoutTableProps) {
-  const { toast } = useToast()
+export function PayoutsTable({ payouts, merchants, onRefresh }: PayoutsTableProps) {
+  const [isRefreshing, setIsRefreshing] = useState(false)
 
-  usePayoutWebhooks((event) => {
-    if (!event) return
-    
-    if (event.event_type === 'payout_processed') {
-      onRefresh?.()
-    }
-  })
+  const handleRefresh = async () => {
+    setIsRefreshing(true)
+    await onRefresh()
+    setIsRefreshing(false)
+  }
 
-  const handlePayout = async (merchantId: string, amount: number, method: string) => {
-    if (!confirm(`Create ${formatCurrency(amount)} payout? This requires admin approval.`)) return
-    
-    try {
-      await createPayout(merchantId, amount, method, 'pending')
-      toast({
-        title: 'Success',
-        description: 'Payout submitted for approval',
-      })
-      onRefresh?.()
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to create payout',
-        variant: 'destructive'
-      })
+  const getMerchantName = (merchantId: string) => {
+    const merchant = merchants.find(m => m.id === merchantId)
+    return merchant?.business_name || merchant?.email || 'Unknown'
+  }
+
+  const getStatusColor = (status: Payout['status']) => {
+    switch (status) {
+      case 'pending':
+        return 'secondary'
+      case 'processing':
+        return 'default'
+      case 'completed':
+        return 'default'
+      case 'failed':
+        return 'destructive'
+      default:
+        return 'secondary'
     }
   }
 
-  const { 
-    data: serverPayouts = [], 
-    isLoading, 
-    refetch 
-  } = useQuery<Payout[]>({
-    queryKey: ['payouts'],
-    queryFn: getPayouts
-  })
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+    }).format(amount)
+  }
 
-  const displayPayouts = payouts || serverPayouts
-
-  const columns: ColumnDef<Payout>[] = [
-    {
-      accessorKey: 'merchant_email',
-      header: 'Merchant',
-    },
-    {
-      accessorKey: 'amount',
-      header: 'Amount',
-      cell: ({ row }) => formatCurrency(row.getValue('amount'))
-    },
-    {
-      accessorKey: 'method',
-      header: 'Method',
-    },
-    {
-      accessorKey: 'status',
-      header: 'Status',
-    },
-    {
-      accessorKey: 'notifications',
-      header: 'Notifications',
-      cell: ({ row }) => (
-        <div className="flex gap-1">
-          {row.original.notify_by?.includes('email') && <Mail className="h-4 w-4" />}
-          {row.original.notify_by?.includes('sms') && <Phone className="h-4 w-4" />}
-        </div>
-      )
-    }
-  ]
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString()
+  }
 
   return (
-    <div className="flex justify-end mb-4">
-      <Button 
-        variant="ghost" 
-        size="sm"
-        onClick={() => refetch()}
-        disabled={isLoading}
-      >
-        {isLoading ? 'Refreshing...' : 'Refresh'}
-      </Button>
-      <DataTable columns={columns} data={displayPayouts} mobileCardView={true} />
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-medium">Payout Requests</h3>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleRefresh}
+          disabled={isRefreshing}
+        >
+          <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+          Refresh
+        </Button>
+      </div>
+
+      <div className="border rounded-md">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Merchant</TableHead>
+              <TableHead>Amount</TableHead>
+              <TableHead>Method</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Created</TableHead>
+              <TableHead>Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {payouts.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={6} className="text-center text-muted-foreground">
+                  No payout requests found
+                </TableCell>
+              </TableRow>
+            ) : (
+              payouts.map((payout) => (
+                <TableRow key={payout.id}>
+                  <TableCell className="font-medium">
+                    {getMerchantName(payout.merchant_id)}
+                  </TableCell>
+                  <TableCell>{formatCurrency(payout.amount)}</TableCell>
+                  <TableCell className="capitalize">{payout.payment_method.replace('_', ' ')}</TableCell>
+                  <TableCell>
+                    <Badge variant={getStatusColor(payout.status)}>
+                      {payout.status}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>{formatDate(payout.created_at)}</TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <Button variant="ghost" size="sm">
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                      {payout.status === 'pending' && (
+                        <>
+                          <Button variant="ghost" size="sm" className="text-green-600">
+                            <Check className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="sm" className="text-red-600">
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </div>
     </div>
   )
 }

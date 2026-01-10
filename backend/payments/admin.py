@@ -4,10 +4,10 @@ from django.db.models.functions import TruncDay, TruncMonth
 from .models.payment import Payment
 from .models.payment_method import PaymentMethod
 from .models.transaction import Transaction
-from .models.merchant import Merchant as PaymentsMerchant
+from users.models import Merchant as PaymentsMerchant  # Import from users app
 from .models.payment_log import PaymentLog as PaymentsPaymentLog
 from .models.subscription import Subscription
-from .models.ussd_transaction import USSDTransaction
+from .models.ussd_transaction import SimpleUSSDTransaction as USSDTransaction
 from .models.scheduled_payout import ScheduledPayout
 # from .models import ReportDashboard  # TODO: Check if this model exists
 from .models.cross_border import CrossBorderRemittance
@@ -385,64 +385,140 @@ class PaymentAdmin(admin.ModelAdmin):
                 payment.exchange_rate,
                 payment.get_status_display()
             ])
-        
-        return response
 
     actions = [mark_completed, mark_failed, export_csv, export_bill_payments_csv, export_remittances_csv]
 
-class BillPaymentAdmin(admin.ModelAdmin):
-    list_display = ('bill_reference', 'customer', 'amount', 'bill_type', 'remittance_status', 'days_overdue', 'compliance_status', 'compliance_checks')
-    list_filter = (PaymentTypeFilter, BillerFilter, 'bill_type', 'status', 'is_remitted', 'due_date')
-    search_fields = ('bill_reference', 'customer__user__email', 'merchant__name')
-    actions = ['generate_remittance_report', 'export_as_json', 'bulk_remit']
-    readonly_fields = ('remittance_reference', 'remittance_date', 'compliance_checks')
-    date_hierarchy = 'due_date'
-    
+@admin.register(SimpleUSSDTransaction)
+class USSDTransactionAdmin(admin.ModelAdmin):
+    list_display = ('transaction_id', 'session', 'transaction_type', 'amount', 'currency', 'status', 'recipient', 'created_at')
+    list_filter = ('status', 'transaction_type', 'currency', 'created_at')
+    search_fields = ('transaction_id', 'session__msisdn', 'recipient')
+    readonly_fields = ('transaction_id', 'session', 'created_at', 'updated_at')
+    ordering = ('-created_at',)
+
     fieldsets = (
-        (None, {
-            'fields': ('customer', 'merchant', 'amount', 'currency', 'status')
+        ('Transaction Details', {
+            'fields': ('transaction_id', 'session', 'transaction_type', 'status')
         }),
-        ('Bill Information', {
-            'fields': ('bill_reference', 'bill_type', 'bill_issuer', 'due_date', 'late_fee')
+        ('Financial Information', {
+            'fields': ('amount', 'currency', 'recipient')
         }),
-        ('Remittance Details', {
-            'fields': ('is_remitted', 'remittance_reference', 'remittance_date', 'compliance_checks'),
+        ('Service Details', {
+            'fields': ('service_provider', 'account_number')
+        }),
+        ('External References', {
+            'fields': ('external_transaction_id', 'payment'),
             'classes': ('collapse',)
-        })
+        }),
+        ('Timing', {
+            'fields': ('created_at', 'completed_at'),
+            'classes': ('collapse',)
+        }),
+        ('Error Handling', {
+            'fields': ('error_message', 'error_code'),
+            'classes': ('collapse',)
+        }),
     )
-    
-    def remittance_status(self, obj):
-        if obj.is_remitted:
-            return format_html('<span class="badge badge-success">✓ Remitted</span>')
-        elif obj.due_date and obj.due_date < timezone.now().date():
-            return format_html('<span class="badge badge-danger">⚠ Overdue</span>')
-        return format_html('<span class="badge badge-warning">Pending</span>')
-    remittance_status.short_description = 'Status'
-    
-    def days_overdue(self, obj):
-        if obj.due_date and not obj.is_remitted:
-            delta = (timezone.now().date() - obj.due_date).days
-            return max(0, delta)
-        return 0
-    days_overdue.short_description = 'Days Overdue'
-    
-    def compliance_status(self, obj):
-        if obj.due_date and obj.due_date < timezone.now().date() and not obj.is_remitted:
-            return format_html('<span class="badge badge-danger">Non-Compliant</span>')
-        return format_html('<span class="badge badge-success">Compliant</span>')
-    compliance_status.short_description = 'Compliance'
-    
-    def compliance_checks(self, obj):
-        checks = []
-        if obj.due_date:
-            checks.append(f"Due Date: {obj.due_date}")
-            checks.append(f"Remitted: {'Yes' if obj.is_remitted else 'No'}")
-            if obj.is_remitted:
-                checks.append(f"Remittance Date: {obj.remittance_date}")
-                days_late = (obj.remittance_date.date() - obj.due_date).days
-                checks.append(f"Days {'Early' if days_late < 0 else 'Late'}: {abs(days_late)}")
-        return format_html("<br>".join(checks))
-    compliance_checks.short_description = 'Compliance Details'
+
+    def get_queryset(self, request):
+        """Show only recent transactions by default"""
+        qs = super().get_queryset(request)
+        if not request.GET.get('show_all'):
+            # Show last 30 days by default
+            from django.utils import timezone
+            from datetime import timedelta
+            thirty_days_ago = timezone.now() - timedelta(days=30)
+            return qs.filter(created_at__gte=thirty_days_ago)
+        return qs
+
+    def has_add_permission(self, request):
+        return False  # Transactions are created automatically
+
+    @admin.action(description='Approve selected pending transactions')
+    def approve_transactions(self, request, queryset):
+        approved_count = 0
+        for transaction in queryset.filter(status='pending_approval'):
+            success, message = transaction.approve_transaction(request.user)
+            if success:
+                approved_count += 1
+                # Trigger approval notification
+                self._send_approval_notification(transaction)
+
+        self.message_user(request, f"Approved {approved_count} transactions")
+
+    @admin.action(description='Reject selected pending transactions')
+    def reject_transactions(self, request, queryset):
+        rejected_count = 0
+        for transaction in queryset.filter(status='pending_approval'):
+            success, message = transaction.reject_transaction(request.user, "Rejected by admin")
+            if success:
+                rejected_count += 1
+                # Trigger rejection notification
+                self._send_rejection_notification(transaction)
+
+        self.message_user(request, f"Rejected {rejected_count} transactions")
+
+    def _send_approval_notification(self, transaction):
+        """Send approval notification to user"""
+        try:
+            # Use the comprehensive notification service
+            from .services.notification_service import NotificationService
+
+            # Get user phone number from session
+            phone_number = transaction.session.msisdn
+
+            context = {
+                'amount': float(transaction.amount),
+                'type': transaction.get_transaction_type_display(),
+                'transaction_id': transaction.transaction_id[-8:],
+                'recipient': transaction.recipient,
+                'status': 'Approved'
+            }
+
+            # Send SMS notification
+            NotificationService.send_notification(
+                notification_type='ussd_approval',  # This would need to be added to the notification service
+                recipient_phone=phone_number,
+                context=context,
+                channels=['sms']
+            )
+
+            logger.info(f"Approval notification sent for transaction {transaction.transaction_id}")
+
+        except Exception as e:
+            logger.error(f"Failed to send approval notification: {e}")
+
+    def _send_rejection_notification(self, transaction):
+        """Send rejection notification to user"""
+        try:
+            # Use the comprehensive notification service
+            from .services.notification_service import NotificationService
+
+            # Get user phone number from session
+            phone_number = transaction.session.msisdn
+
+            context = {
+                'amount': float(transaction.amount),
+                'type': transaction.get_transaction_type_display(),
+                'transaction_id': transaction.transaction_id[-8:],
+                'reason': 'Rejected by admin',
+                'status': 'Rejected'
+            }
+
+            # Send SMS notification
+            NotificationService.send_notification(
+                notification_type='ussd_rejection',  # This would need to be added to the notification service
+                recipient_phone=phone_number,
+                context=context,
+                channels=['sms']
+            )
+
+            logger.info(f"Rejection notification sent for transaction {transaction.transaction_id}")
+
+        except Exception as e:
+            logger.error(f"Failed to send rejection notification: {e}")
+
+    actions = [approve_transactions, reject_transactions]
     
     def generate_remittance_report(self, request, queryset):
         """Enhanced report with additional metrics and visualization data"""
@@ -746,11 +822,12 @@ class TransactionAdmin(admin.ModelAdmin):
         
         return response
 
-@admin.register(PaymentsMerchant)
-class PaymentsMerchantAdmin(admin.ModelAdmin):
-    list_display = ('user', 'business_name', 'is_biller', 'is_subscription_provider')
-    list_filter = ('is_biller', 'is_subscription_provider', 'is_remittance_agent')
-    search_fields = ('user__email', 'business_name')
+# Merchant is already registered in users/admin.py
+# @admin.register(PaymentsMerchant)
+# class PaymentsMerchantAdmin(admin.ModelAdmin):
+#     list_display = ('user', 'business_name', 'is_biller', 'is_subscription_provider')
+#     list_filter = ('is_biller', 'is_subscription_provider', 'is_remittance_agent')
+#     search_fields = ('user__email', 'business_name')
 
 @admin.register(PaymentsPaymentLog)
 class PaymentsPaymentLogAdmin(admin.ModelAdmin):
@@ -764,17 +841,93 @@ class SubscriptionAdmin(admin.ModelAdmin):
     list_filter = ('status', 'tier', 'created_at')
     search_fields = ('customer__user__email', 'provider__business_name')
 
-@admin.register(USSDTransaction)
-class USSDTransactionAdmin(admin.ModelAdmin):
-    list_display = ('session_id', 'phone_number', 'status', 'amount', 'created_at')
-    list_filter = ('status', 'created_at')
-    search_fields = ('session_id', 'phone_number')
+@admin.register(USSDMenu)
+class USSDMenuAdmin(admin.ModelAdmin):
+    """Admin interface for USSD menu configuration"""
+    list_display = ('menu_id', 'menu_type', 'title', 'language', 'is_default', 'is_active', 'updated_at')
+    list_filter = ('menu_type', 'language', 'is_default', 'is_active', 'created_at')
+    search_fields = ('menu_id', 'title', 'content')
+    ordering = ('menu_type', 'language', 'menu_id')
 
-@admin.register(ScheduledPayout)
-class ScheduledPayoutAdmin(admin.ModelAdmin):
-    list_display = ('merchant', 'amount', 'status', 'next_execution', 'created_at')
-    list_filter = ('status', 'next_execution', 'created_at')
-    search_fields = ('merchant__business_name',)
+    fieldsets = (
+        ('Menu Configuration', {
+            'fields': ('menu_id', 'menu_type', 'title', 'content', 'language', 'is_default')
+        }),
+        ('Navigation', {
+            'fields': ('parent_menu', 'timeout_seconds')
+        }),
+        ('Options', {
+            'fields': ('options',),
+            'classes': ('collapse',),
+            'description': 'JSON format: [{"input": "1", "text": "Option 1", "action": "next_menu"}]'
+        }),
+        ('Status', {
+            'fields': ('is_active',)
+        }),
+        ('Timestamps', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+
+    readonly_fields = ('created_at', 'updated_at')
+
+    def get_queryset(self, request):
+        """Show only active menus by default, with option to show all"""
+        qs = super().get_queryset(request)
+        if request.GET.get('show_all') != '1':
+            return qs.filter(is_active=True)
+        return qs
+
+    def changelist_view(self, request, extra_context=None):
+        """Add custom context to show inactive count"""
+        response = super().changelist_view(request, extra_context)
+        if hasattr(response, 'context_data') and 'cl' in response.context_data:
+            queryset = self.get_queryset(request)
+            inactive_count = queryset.filter(is_active=False).count()
+            response.context_data['inactive_count'] = inactive_count
+        return response
+
+@admin.register(USSDProvider)
+class USSDProviderAdmin(admin.ModelAdmin):
+    """Admin interface for USSD provider configuration"""
+    list_display = ('name', 'provider_type', 'short_code', 'is_active', 'health_status', 'last_health_check')
+    list_filter = ('provider_type', 'is_active', 'health_status')
+    search_fields = ('name', 'provider_type', 'short_code')
+    ordering = ('provider_type', 'name')
+
+    fieldsets = (
+        ('Provider Information', {
+            'fields': ('name', 'provider_type', 'short_code')
+        }),
+        ('API Configuration', {
+            'fields': ('api_url', 'api_key', 'api_secret'),
+            'classes': ('collapse',),
+            'description': 'Secure API credentials for provider integration'
+        }),
+        ('Service Limits', {
+            'fields': ('max_session_time', 'max_menu_depth', 'requests_per_minute', 'burst_limit')
+        }),
+        ('Language Support', {
+            'fields': ('supported_languages',)
+        }),
+        ('Health Monitoring', {
+            'fields': ('last_health_check', 'health_status'),
+            'classes': ('collapse',)
+        }),
+        ('Status', {
+            'fields': ('is_active',)
+        }),
+    )
+
+    readonly_fields = ('last_health_check',)
+
+    def get_queryset(self, request):
+        """Show only active providers by default"""
+        qs = super().get_queryset(request)
+        if request.GET.get('show_inactive') != '1':
+            return qs.filter(is_active=True)
+        return qs
 
 # @admin.register(ReportDashboard)
 # class ReportDashboardAdmin(admin.ModelAdmin):
@@ -958,5 +1111,399 @@ class ProviderHealthAdmin(admin.ModelAdmin):
 class RemittanceAdmin(PaymentAdmin):
     def get_queryset(self, request):
         return super().get_queryset(request).filter(payment_type='remittance')
-    
+
     list_display = ('id', 'customer_link', 'merchant_link', 'amount_with_currency', 'recipient_name', 'recipient_country', 'status_badge')
+
+
+# Fee Management Admin Classes
+from .models.fees import FeeConfiguration, FeeCalculationLog, MerchantFeeOverride
+from .models.analytics import AnalyticsMetric, DashboardSnapshot, MerchantAnalytics, TransactionAnalytics, PerformanceAlert
+
+@admin.register(FeeConfiguration)
+class FeeConfigurationAdmin(admin.ModelAdmin):
+    list_display = [
+        'name', 'fee_type_badge', 'scope_display', 'corridor_display',
+        'calculation_method_display', 'fee_amount_display', 'is_active_badge',
+        'effective_period', 'created_by', 'created_at'
+    ]
+    list_filter = [
+        'fee_type', 'calculation_method', 'is_active', 'merchant',
+        'corridor_from', 'corridor_to', 'currency', 'is_platform_default',
+        'requires_approval', 'created_by'
+    ]
+    search_fields = ['name', 'description', 'merchant__business_name']
+    readonly_fields = ['created_at', 'updated_at', 'id']
+    ordering = ['-created_at']
+
+    fieldsets = (
+        ('Basic Information', {
+            'fields': ('name', 'fee_type', 'description', 'merchant', 'is_platform_default')
+        }),
+        ('Geographic Scope', {
+            'fields': ('corridor_from', 'corridor_to', 'currency')
+        }),
+        ('Fee Calculation', {
+            'fields': ('calculation_method', 'fixed_fee', 'percentage_fee', 'min_fee', 'max_fee')
+        }),
+        ('Transaction Limits', {
+            'fields': ('min_transaction_amount', 'max_transaction_amount')
+        }),
+        ('Validity Period', {
+            'fields': ('effective_from', 'effective_to')
+        }),
+        ('Settings & Audit', {
+            'fields': ('is_active', 'requires_approval', 'created_by', 'approved_by'),
+            'classes': ('collapse',)
+        }),
+    )
+
+    def fee_type_badge(self, obj):
+        colors = {
+            'remittance': 'blue',
+            'domestic_transfer': 'green',
+            'payment': 'purple',
+            'merchant_service': 'orange',
+            'platform_fee': 'red',
+            'withdrawal': 'yellow',
+            'deposit': 'cyan',
+            'bill_payment': 'pink',
+            'airtime': 'indigo',
+            'data_bundle': 'teal',
+        }
+        color = colors.get(obj.fee_type, 'gray')
+        return format_html(
+            '<span class="badge badge-{}">{}</span>',
+            color,
+            obj.get_fee_type_display()
+        )
+    fee_type_badge.short_description = 'Fee Type'
+
+    def scope_display(self, obj):
+        if obj.merchant:
+            return format_html('<strong>Merchant:</strong> {}', obj.merchant.business_name)
+        elif obj.is_platform_default:
+            return format_html('<span class="text-green-600"><strong>Platform Default</strong></span>')
+        else:
+            return format_html('<span class="text-blue-600"><strong>Platform</strong></span>')
+    scope_display.short_description = 'Scope'
+
+    def corridor_display(self, obj):
+        if obj.corridor_from and obj.corridor_to:
+            return f"{obj.corridor_from} → {obj.corridor_to}"
+        elif obj.corridor_from:
+            return f"{obj.corridor_from} → ALL"
+        elif obj.corridor_to:
+            return f"ALL → {obj.corridor_to}"
+        else:
+            return "ALL → ALL"
+    corridor_display.short_description = 'Corridor'
+
+    def calculation_method_display(self, obj):
+        method_map = {
+            'fixed': 'Fixed Amount',
+            'percentage': 'Percentage',
+            'tiered': 'Tiered',
+            'volume_based': 'Volume Based'
+        }
+        return method_map.get(obj.calculation_method, obj.calculation_method)
+    calculation_method_display.short_description = 'Calculation'
+
+    def fee_amount_display(self, obj):
+        if obj.calculation_method == 'fixed':
+            return f"${obj.fixed_fee}"
+        elif obj.calculation_method == 'percentage':
+            return f"{obj.percentage_fee * 100:.2f}%"
+        else:
+            parts = []
+            if obj.fixed_fee:
+                parts.append(f"${obj.fixed_fee}")
+            if obj.percentage_fee:
+                parts.append(f"{obj.percentage_fee * 100:.2f}%")
+            return " + ".join(parts) if parts else "Complex"
+    fee_amount_display.short_description = 'Fee Amount'
+
+    def is_active_badge(self, obj):
+        if obj.is_active:
+            return format_html('<span class="text-green-600">✓ Active</span>')
+        else:
+            return format_html('<span class="text-red-600">✗ Inactive</span>')
+    is_active_badge.short_description = 'Status'
+
+    def effective_period(self, obj):
+        if obj.effective_to:
+            return f"{obj.effective_from.strftime('%Y-%m-%d')} to {obj.effective_to.strftime('%Y-%m-%d')}"
+        else:
+            return f"From {obj.effective_from.strftime('%Y-%m-%d')}"
+    effective_period.short_description = 'Effective Period'
+
+    def save_model(self, request, obj, form, change):
+        if not change:  # New object
+            obj.created_by = request.user
+        super().save_model(request, obj, form, change)
+
+    def has_change_permission(self, request, obj=None):
+        if obj and obj.requires_approval and not request.user.is_superuser:
+            # Only allow changes by the creator or superuser
+            return obj.created_by == request.user or request.user.is_superuser
+        return super().has_change_permission(request, obj)
+
+    def has_delete_permission(self, request, obj=None):
+        if obj and obj.requires_approval and not request.user.is_superuser:
+            return obj.created_by == request.user
+        return super().has_delete_permission(request, obj)
+
+
+@admin.register(FeeCalculationLog)
+class FeeCalculationLogAdmin(admin.ModelAdmin):
+    list_display = [
+        'transaction_type', 'transaction_id', 'merchant_display',
+        'amount_display', 'calculated_fee_display', 'corridor_display',
+        'user_display', 'calculated_at'
+    ]
+    list_filter = [
+        'transaction_type', 'merchant', 'corridor_from', 'corridor_to',
+        'currency', 'calculated_at', 'fee_configuration'
+    ]
+    search_fields = ['transaction_id', 'merchant__business_name', 'user__email']
+    readonly_fields = ['calculated_at', 'breakdown_json']
+    ordering = ['-calculated_at']
+    date_hierarchy = 'calculated_at'
+
+    def merchant_display(self, obj):
+        return obj.merchant.business_name if obj.merchant else "Platform"
+    merchant_display.short_description = 'Merchant'
+
+    def amount_display(self, obj):
+        return f"${obj.amount} {obj.currency}"
+    amount_display.short_description = 'Amount'
+
+    def calculated_fee_display(self, obj):
+        return f"${obj.calculated_fee} {obj.currency}"
+    calculated_fee_display.short_description = 'Fee'
+
+    def corridor_display(self, obj):
+        if obj.corridor_from and obj.corridor_to:
+            return f"{obj.corridor_from} → {obj.corridor_to}"
+        else:
+            return "N/A"
+    corridor_display.short_description = 'Corridor'
+
+    def user_display(self, obj):
+        return obj.user.email if obj.user else "N/A"
+    user_display.short_description = 'User'
+
+    def breakdown_json(self, obj):
+        return format_html('<pre>{}</pre>', json.dumps(obj.breakdown, indent=2))
+    breakdown_json.short_description = 'Calculation Breakdown'
+
+
+@admin.register(MerchantFeeOverride)
+class MerchantFeeOverrideAdmin(admin.ModelAdmin):
+    list_display = [
+        'merchant_display', 'fee_configuration_display', 'status_badge',
+        'requested_by', 'reviewed_by', 'created_at'
+    ]
+    list_filter = [
+        'status', 'fee_configuration__fee_type', 'merchant',
+        'requested_by', 'reviewed_by', 'created_at'
+    ]
+    search_fields = ['merchant__business_name', 'fee_configuration__name', 'justification']
+    readonly_fields = ['created_at', 'updated_at', 'reviewed_at']
+    ordering = ['-created_at']
+
+    fieldsets = (
+        ('Request Information', {
+            'fields': ('merchant', 'fee_configuration', 'justification')
+        }),
+        ('Proposed Changes', {
+            'fields': ('proposed_fixed_fee', 'proposed_percentage_fee',
+                      'proposed_min_fee', 'proposed_max_fee')
+        }),
+        ('Review Information', {
+            'fields': ('status', 'reviewed_by', 'reviewed_at', 'review_notes',
+                      'effective_from', 'effective_to')
+        }),
+    )
+
+    def merchant_display(self, obj):
+        return obj.merchant.business_name
+    merchant_display.short_description = 'Merchant'
+
+    def fee_configuration_display(self, obj):
+        return format_html(
+            '<strong>{}</strong><br><small>{}</small>',
+            obj.fee_configuration.name,
+            obj.fee_configuration.get_fee_type_display()
+        )
+    fee_configuration_display.short_description = 'Fee Configuration'
+
+    def status_badge(self, obj):
+        colors = {
+            'pending': 'yellow',
+            'approved': 'green',
+            'rejected': 'red',
+            'expired': 'gray'
+        }
+        color = colors.get(obj.status, 'gray')
+        return format_html(
+            '<span class="badge badge-{}">{}</span>',
+            color,
+            obj.get_status_display()
+        )
+    status_badge.short_description = 'Status'
+
+    actions = ['approve_override', 'reject_override']
+
+    @admin.action(description='Approve selected fee overrides')
+    def approve_override(self, request, queryset):
+        for override in queryset.filter(status='pending'):
+            override.status = 'approved'
+            override.reviewed_by = request.user
+            override.reviewed_at = timezone.now()
+            override.save()
+
+            # Create the actual fee configuration
+            FeeConfiguration.objects.create(
+                name=f"{override.merchant.business_name} - {override.fee_configuration.fee_type}",
+                fee_type=override.fee_configuration.fee_type,
+                merchant=override.merchant,
+                corridor_from=override.fee_configuration.corridor_from,
+                corridor_to=override.fee_configuration.corridor_to,
+                currency=override.fee_configuration.currency,
+                calculation_method=override.fee_configuration.calculation_method,
+                fixed_fee=override.proposed_fixed_fee or override.fee_configuration.fixed_fee,
+                percentage_fee=override.proposed_percentage_fee or override.fee_configuration.percentage_fee,
+                min_fee=override.proposed_min_fee or override.fee_configuration.min_fee,
+                max_fee=override.proposed_max_fee or override.fee_configuration.max_fee,
+                effective_from=override.effective_from or timezone.now(),
+                effective_to=override.effective_to,
+                is_active=True,
+                requires_approval=False,
+                created_by=request.user,
+                approved_by=request.user,
+            )
+
+        self.message_user(request, f"Approved {queryset.filter(status='pending').count()} fee overrides")
+
+    @admin.action(description='Reject selected fee overrides')
+    def reject_override(self, request, queryset):
+        updated = queryset.filter(status='pending').update(
+            status='rejected',
+            reviewed_by=request.user,
+            reviewed_at=timezone.now()
+        )
+        self.message_user(request, f"Rejected {updated} fee overrides")
+
+    def has_change_permission(self, request, obj=None):
+        if obj and obj.status != 'pending':
+            return False  # Can't modify approved/rejected overrides
+        return super().has_change_permission(request, obj)
+
+
+# Analytics Admin Classes
+@admin.register(DashboardSnapshot)
+class DashboardSnapshotAdmin(admin.ModelAdmin):
+    list_display = [
+        'date', 'total_transactions', 'total_transaction_value',
+        'total_fee_revenue', 'success_rate', 'active_merchants', 'active_customers'
+    ]
+    readonly_fields = [
+        'date', 'total_transactions', 'total_transaction_value', 'total_fee_revenue',
+        'active_merchants', 'active_customers', 'new_registrations',
+        'successful_transactions', 'failed_transactions', 'success_rate',
+        'transactions_by_country', 'revenue_by_country', 'payment_method_usage',
+        'top_merchants_by_volume', 'top_merchants_by_revenue',
+        'kyc_completion_rate', 'high_risk_transactions', 'reported_to_regulator'
+    ]
+    ordering = ['-date']
+    date_hierarchy = 'date'
+
+    def has_add_permission(self, request):
+        return False  # Snapshots are created automatically
+
+    def has_change_permission(self, request, obj=None):
+        return False  # Snapshots are read-only
+
+
+@admin.register(MerchantAnalytics)
+class MerchantAnalyticsAdmin(admin.ModelAdmin):
+    list_display = [
+        'merchant', 'date', 'transaction_count', 'transaction_value',
+        'fee_revenue', 'success_rate', 'unique_customers'
+    ]
+    list_filter = ['date', 'merchant']
+    search_fields = ['merchant__business_name']
+    readonly_fields = [
+        'merchant', 'date', 'transaction_count', 'transaction_value', 'fee_revenue',
+        'unique_customers', 'new_customers', 'success_rate', 'average_transaction_value',
+        'transactions_by_country', 'payment_method_usage', 'high_risk_transactions',
+        'kyc_pending_customers'
+    ]
+    ordering = ['-date', '-transaction_value']
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(PerformanceAlert)
+class PerformanceAlertAdmin(admin.ModelAdmin):
+    list_display = [
+        'alert_type', 'severity', 'title', 'is_active', 'acknowledged_by',
+        'created_at', 'resolved_at'
+    ]
+    list_filter = ['alert_type', 'severity', 'is_active', 'created_at']
+    search_fields = ['title', 'description']
+    readonly_fields = [
+        'alert_type', 'severity', 'title', 'description', 'affected_entities',
+        'metrics', 'threshold_breached', 'suggested_actions', 'created_at',
+        'acknowledged_at', 'resolved_at'
+    ]
+    ordering = ['-created_at']
+
+    actions = ['acknowledge_alerts', 'resolve_alerts']
+
+    @admin.action(description='Acknowledge selected alerts')
+    def acknowledge_alerts(self, request, queryset):
+        updated = queryset.filter(is_active=True).update(
+            acknowledged_by=request.user,
+            acknowledged_at=timezone.now()
+        )
+        self.message_user(request, f'Acknowledged {updated} alerts')
+
+    @admin.action(description='Resolve selected alerts')
+    def resolve_alerts(self, request, queryset):
+        updated = queryset.filter(is_active=True).update(
+            resolved_at=timezone.now(),
+            is_active=False
+        )
+        self.message_user(request, f'Resolved {updated} alerts')
+
+
+@admin.register(TransactionAnalytics)
+class TransactionAnalyticsAdmin(admin.ModelAdmin):
+    list_display = [
+        'transaction_type', 'transaction_id', 'merchant', 'customer',
+        'amount', 'fee_amount', 'status', 'risk_score', 'created_at'
+    ]
+    list_filter = [
+        'transaction_type', 'status', 'risk_score', 'created_at',
+        'merchant', 'country_from', 'country_to'
+    ]
+    search_fields = ['transaction_id', 'merchant__business_name', 'customer__user__email']
+    readonly_fields = [
+        'transaction_type', 'transaction_id', 'merchant', 'customer', 'amount',
+        'fee_amount', 'currency', 'payment_method', 'country_from', 'country_to',
+        'status', 'risk_score', 'processing_time_ms', 'device_info', 'ip_address',
+        'user_agent', 'created_at'
+    ]
+    ordering = ['-created_at']
+    date_hierarchy = 'created_at'
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False

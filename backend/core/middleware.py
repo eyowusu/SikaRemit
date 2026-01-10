@@ -6,10 +6,11 @@ import uuid
 import traceback
 from django.core.cache import cache
 from django.conf import settings
+from core.api_utils import api_error
 
 logger = logging.getLogger(__name__)
 
-class RequestLogMiddleware(MiddlewareMixin):
+class RequestLoggingMiddleware(MiddlewareMixin):
     def process_request(self, request):
         request.start_time = time.time()
         request.request_id = str(uuid.uuid4())
@@ -90,8 +91,6 @@ class RateLimitMiddleware(MiddlewareMixin):
             # Increment count
             cache.set(key, request_count + 1, timeout=60)
 
-from django.db import models
-from django.utils.deprecation import MiddlewareMixin
 from accounts.models import AdminActivity
 import json
 import logging
@@ -137,14 +136,13 @@ class AdminActivityMiddleware(MiddlewareMixin):
             AdminActivity.objects.create(
                 admin=request.user,
                 action_type=action_type,
-                object_type=object_type,
-                object_id=request.POST.get('id') or None,
-                ip_address=request.META.get('REMOTE_ADDR'),
-                metadata={
+                details={
                     'path': request.path,
                     'method': request.method,
                     'status_code': response.status_code
-                }
+                },
+                ip_address=request.META.get('REMOTE_ADDR'),
+                user_agent=request.META.get('HTTP_USER_AGENT')
             )
         except Exception as e:
             logger.error(f'Failed to log admin activity: {e}')
@@ -153,10 +151,12 @@ class AdminActivityMiddleware(MiddlewareMixin):
     
     def _determine_action_type(self, request):
         if request.method == 'POST':
-            return 'CREATE' if 'add' in request.path else 'UPDATE'
+            if 'add' in request.path:
+                return 'USER_MOD'  # Assuming user creation
+            return 'USER_MOD'  # General modification
         elif request.method == 'DELETE':
-            return 'DELETE'
-        return 'UPDATE'
+            return 'USER_MOD'  # Deletion as modification
+        return 'USER_MOD'  # Default to modification
     
     def _determine_object_type(self, request):
         path_parts = [p for p in request.path.split('/') if p]
@@ -226,16 +226,70 @@ class RequestIDMiddleware(MiddlewareMixin):
             
         return response
 
-from django.db.utils import OperationalError
-from django.db import connections
-from .db import check_connections
+from functools import wraps
+from django.utils.decorators import method_decorator
+import time
+import logging
 
-class ConnectionCheckMiddleware:
+logger = logging.getLogger(__name__)
+
+def api_performance_monitor(view_func=None, threshold_ms=1000):
+    """
+    Decorator to monitor API endpoint performance
+    Logs slow requests and adds performance headers
+    """
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            start_time = time.time()
+
+            # Get request object (different for function vs method views)
+            request = args[0] if hasattr(args[0], 'method') else args[1]
+
+            try:
+                result = func(*args, **kwargs)
+
+                # Calculate duration
+                duration_ms = (time.time() - start_time) * 1000
+
+                # Log slow requests
+                if duration_ms > threshold_ms:
+                    user_info = getattr(request.user, 'email', 'anonymous') if request.user.is_authenticated else 'anonymous'
+                    logger.warning(
+                        f"SLOW_API_REQUEST: {request.method} {request.path} "
+                        f"duration={duration_ms:.2f}ms user={user_info}"
+                    )
+
+                # Add performance header to response
+                if hasattr(result, 'data'):  # DRF Response
+                    result['X-API-Response-Time'] = f"{duration_ms:.2f}ms"
+                elif hasattr(result, '__setitem__'):  # Django HttpResponse
+                    result['X-API-Response-Time'] = f"{duration_ms:.2f}ms"
+
+                return result
+
+            except Exception as e:
+                duration_ms = (time.time() - start_time) * 1000
+                logger.error(
+                    f"API_EXCEPTION: {request.method} {request.path} "
+                    f"duration={duration_ms:.2f}ms exception={type(e).__name__}"
+                )
+                raise
+
+        return wrapper
+
+    if view_func:
+        return decorator(view_func)
+    return decorator
+
+# Method decorator version for class-based views
+api_performance_monitor_method = method_decorator(api_performance_monitor)
+
+class DisableCSRF:
     def __init__(self, get_response):
         self.get_response = get_response
 
     def __call__(self, request):
-        # Verify connections before processing request
-        check_connections()
-        response = self.get_response(request)
-        return response
+        if request.path.startswith('/api/'):
+            setattr(request, '_dont_enforce_csrf_checks', True)
+        return self.get_response(request)

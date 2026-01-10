@@ -3,14 +3,16 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.exceptions import PermissionDenied, ValidationError
+from rest_framework.views import APIView
+from rest_framework.pagination import PageNumberPagination
 
 from core.response import APIResponse
-from .models import User, Merchant, Customer, KYCDocument
-from .serializers import UserSerializer, MerchantSerializer, CustomerSerializer, KYCDocumentSerializer
-from .services import UserService, KYCService
-from .permissions import IsAdminUser, IsOwnerOrAdmin
-from .tasks import send_verification_email, send_merchant_approval_email
-from .biometrics import BiometricVerifier
+from users.models import User, Merchant, Customer, KYCDocument, MerchantCustomer, MerchantKYCSubmission
+from users.serializers import UserSerializer, MerchantSerializer, CustomerSerializer, KYCDocumentSerializer, MerchantCustomerSerializer, MerchantKYCSubmissionSerializer
+from users.services import UserService, KYCService
+from users.permissions import IsAdminUser, IsOwnerOrAdmin
+from users.tasks import send_verification_email, send_merchant_approval_email
+from users.biometrics import BiometricVerifier
 import uuid
 from django.shortcuts import get_object_or_404
 
@@ -223,6 +225,31 @@ class MerchantViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
+    @action(detail=False, methods=['get'])
+    def profile(self, request):
+        """Get current merchant's profile."""
+        try:
+            # For merchants, return their own profile
+            if request.user.user_type == 2:  # Merchant
+                merchant = self.get_queryset().filter(user=request.user).first()
+                if not merchant:
+                    return APIResponse(
+                        {'error': 'Merchant profile not found'}, 
+                        status=status.HTTP_404_NOT_FOUND
+                    )
+                serializer = self.get_serializer(merchant)
+                return APIResponse(serializer.data)
+            else:
+                return APIResponse(
+                    {'error': 'Only merchants can access this endpoint'}, 
+                    status=status.HTTP_403_FORBIDDEN
+                )
+        except Exception as e:
+            return APIResponse(
+                {'error': 'Failed to retrieve merchant profile'}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
     @action(detail=True, methods=['post'], permission_classes=[IsAdminUser])
     def approve(self, request, pk=None):
         """Approve a merchant (admin only)."""
@@ -289,6 +316,18 @@ class CustomerViewSet(viewsets.ModelViewSet):
         if user.user_type == 1:  # Admin
             return Customer.objects.all()
         return Customer.objects.filter(user=user)
+
+    @action(detail=False, methods=['get'])
+    def me(self, request):
+        """Get current user's customer profile."""
+        try:
+            customer = self.get_queryset().first()
+            if not customer:
+                return APIResponse({'error': 'Customer profile not found'}, status=status.HTTP_404_NOT_FOUND)
+            serializer = self.get_serializer(customer)
+            return APIResponse(serializer.data)
+        except Exception as e:
+            return APIResponse({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def list(self, request, *args, **kwargs):
         """List customers with proper permission filtering."""
@@ -370,26 +409,107 @@ class CustomerViewSet(viewsets.ModelViewSet):
             return APIResponse(result)
         except Exception as e:
             return APIResponse({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
-    
+
     @action(detail=True, methods=['post'])
     def check_liveness(self, request, pk=None):
         customer = self.get_object()
         try:
-            result = BiometricVerifier.check_liveness(
-                request.data['video_url']
-            )
-            
+            result = BiometricVerifier.check_liveness(request.data['video_url'])
+
             if result.get('error'):
                 return APIResponse(result, status=status.HTTP_400_BAD_REQUEST)
-                
-            customer.user.biometric_data['liveness'] = result
-            if result['is_live']:
-                customer.user.verification_level = 3
+
+            biometric_data = customer.user.biometric_data or {}
+            biometric_data['liveness'] = result
+            customer.user.biometric_data = biometric_data
+            customer.user.verification_level = max(customer.user.verification_level, 1)
+            customer.user.last_biometric_verify = timezone.now()
             customer.user.save()
-            
+
             return APIResponse(result)
+        except KeyError:
+            return APIResponse({'error': 'video_url is required'}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             return APIResponse({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=False, methods=['post'], url_path='realtime_subscribe')
+    def subscribe(self, request):
+        """Subscribe to real-time updates."""
+        try:
+            # Placeholder implementation
+            return APIResponse({'message': 'Subscribed to real-time updates'})
+        except Exception as e:
+            return APIResponse(
+                {'error': 'Failed to subscribe'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    @action(detail=False, methods=['post'], url_path='realtime_unsubscribe')
+    def unsubscribe(self, request):
+        """Unsubscribe from real-time updates."""
+        try:
+            # Placeholder implementation
+            return APIResponse({'message': 'Unsubscribed from real-time updates'})
+        except Exception as e:
+            return APIResponse(
+                {'error': 'Failed to unsubscribe'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    @action(detail=False, methods=['get'], url_path='realtime_status')
+    def realtime_status(self, request):
+        """Get real-time connection status."""
+        try:
+            # Return mock status for now - in production this would check WebSocket connections
+            return APIResponse({
+                'isConnected': True,
+                'connectionType': 'websocket',
+                'lastHeartbeat': timezone.now().isoformat(),
+                'reconnectAttempts': 0,
+                'subscribedChannels': ['balance', 'transactions', 'notifications']
+            })
+        except Exception as e:
+            return APIResponse(
+                {'error': 'Failed to get realtime status'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    @action(detail=False, methods=['get'], url_path='balance')
+    def balance(self, request):
+        """Get customer account balance."""
+        try:
+            from payments.services.currency_service import WalletService, CurrencyService
+            
+            # Get user's wallet balances
+            balances = WalletService.get_all_wallet_balances(request.user)
+            if balances:
+                # Return the first currency balance (or USD if available)
+                usd_balance = next((b for b in balances if b.currency and b.currency.code == 'USD'), None)
+                if usd_balance:
+                    primary_balance = usd_balance
+                else:
+                    primary_balance = balances[0]
+                
+                balance = {
+                    'available': float(primary_balance.available_balance),
+                    'pending': float(primary_balance.pending_balance),
+                    'currency': primary_balance.currency.code if primary_balance.currency else 'USD',
+                    'lastUpdated': primary_balance.last_updated.isoformat() if primary_balance.last_updated else timezone.now().isoformat()
+                }
+            else:
+                # No balances yet, return zero balance
+                balance = {
+                    'available': 0.00,
+                    'pending': 0.00,
+                    'currency': 'USD',
+                    'lastUpdated': timezone.now().isoformat()
+                }
+            return APIResponse(balance)
+        except Exception as e:
+            return APIResponse(
+                {'error': 'Failed to get balance'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 
 class KYCDocumentViewSet(viewsets.ModelViewSet):
@@ -407,22 +527,45 @@ class KYCDocumentViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'])
     def approve(self, request, pk=None):
         document = self.get_object()
-        document = KYCService.approve_kyc(
-            document,
-            request.user,
-            request.data.get('notes', '')
-        )
-        return APIResponse(self.get_serializer(document).data)
+        try:
+            document.status = 'APPROVED'
+            document.reviewed_by = request.user
+            document.reviewed_at = timezone.now()
+            document.rejection_reason = ''
+            document.save()
+
+            # Keep Customer KYC status in sync for direct-customer KYC
+            try:
+                customer = document.user.customer_profile
+                customer.update_kyc_status('approved')
+            except Exception:
+                pass
+
+            return APIResponse(self.get_serializer(document).data)
+        except Exception as e:
+            return APIResponse({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
     @action(detail=True, methods=['post'])
     def reject(self, request, pk=None):
         document = self.get_object()
-        document = KYCService.reject_kyc(
-            document,
-            request.user,
-            request.data['reason']
-        )
-        return APIResponse(self.get_serializer(document).data)
+        try:
+            reason = request.data['reason']
+            document.status = 'REJECTED'
+            document.rejection_reason = reason
+            document.reviewed_by = request.user
+            document.reviewed_at = timezone.now()
+            document.save()
+
+            # Keep Customer KYC status in sync for direct-customer KYC
+            try:
+                customer = document.user.customer_profile
+                customer.update_kyc_status('rejected', notes=reason)
+            except Exception:
+                pass
+
+            return APIResponse(self.get_serializer(document).data)
+        except Exception as e:
+            return APIResponse({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class KYCViewSet(viewsets.ViewSet):
@@ -476,6 +619,421 @@ class KYCViewSet(viewsets.ViewSet):
             return APIResponse(KYCDocumentSerializer(document).data)
         except Exception as e:
             return APIResponse({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class MerchantCustomerViewSet(viewsets.ModelViewSet):
+    """ViewSet for managing merchant-customer relationships"""
+    serializer_class = MerchantCustomerSerializer
+    permission_classes = [IsOwnerOrAdmin]
+
+    def get_queryset(self):
+        user = self.request.user
+        if not user.is_authenticated:
+            return MerchantCustomer.objects.none()
+
+        if user.user_type == 1:  # Admin
+            queryset = MerchantCustomer.objects.all()
+        elif user.user_type == 2:  # Merchant
+            merchant = get_object_or_404(Merchant, user=user)
+            queryset = MerchantCustomer.objects.filter(merchant=merchant)
+        else:  # Customer - can only see their own merchant relationships
+            customer = get_object_or_404(Customer, user=user)
+            queryset = MerchantCustomer.objects.filter(customer=customer)
+
+        # Apply filters
+        merchant_id = self.request.query_params.get('merchant_id')
+        customer_id = self.request.query_params.get('customer_id')
+        status_filter = self.request.query_params.get('status')
+        kyc_status = self.request.query_params.get('kyc_status')
+
+        if merchant_id:
+            queryset = queryset.filter(merchant_id=merchant_id)
+        if customer_id:
+            queryset = queryset.filter(customer_id=customer_id)
+        if status_filter:
+            queryset = queryset.filter(status=status_filter)
+        if kyc_status:
+            queryset = queryset.filter(kyc_status=kyc_status)
+
+        return queryset.select_related('merchant__user', 'customer__user')
+
+    @action(detail=False, methods=['post'])
+    def onboard(self, request):
+        """Onboard a customer to a merchant"""
+        try:
+            merchant = get_object_or_404(Merchant, user=request.user)
+            customer = get_object_or_404(Customer, id=request.data['customer_id'])
+
+            merchant_customer = KYCService.onboard_merchant_customer(
+                merchant=merchant,
+                customer=customer,
+                kyc_required=request.data.get('kyc_required', True),
+                notes=request.data.get('notes', '')
+            )
+
+            serializer = self.get_serializer(merchant_customer)
+            return APIResponse(serializer.data, status=status.HTTP_201_CREATED)
+        except Exception as e:
+            return APIResponse({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=['post'])
+    def submit_kyc(self, request, pk=None):
+        """Submit KYC documents for a merchant customer"""
+        try:
+            merchant_customer = self.get_object()
+
+            # Verify merchant owns this relationship
+            if request.user.user_type == 2:
+                merchant = get_object_or_404(Merchant, user=request.user)
+                if merchant_customer.merchant != merchant:
+                    raise PermissionDenied("You can only manage your own customers")
+
+            document = KYCService.submit_merchant_customer_kyc(
+                merchant_customer=merchant_customer,
+                document_type=request.data['document_type'],
+                document_file=request.data['document_file'],
+                auto_escalate=request.data.get('auto_escalate', True)
+            )
+
+            return APIResponse(MerchantKYCSubmissionSerializer(document).data, status=status.HTTP_201_CREATED)
+        except Exception as e:
+            return APIResponse({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=['get'])
+    def kyc_status(self, request, pk=None):
+        """Get detailed KYC status for a merchant customer"""
+        try:
+            merchant_customer = self.get_object()
+            status_data = KYCService.get_merchant_customer_kyc_status(merchant_customer)
+            return APIResponse(status_data)
+        except Exception as e:
+            return APIResponse({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=['post'])
+    def suspend(self, request, pk=None):
+        """Suspend a merchant customer"""
+        try:
+            merchant_customer = self.get_object()
+
+            # Only merchant or admin can suspend
+            if request.user.user_type == 2:
+                merchant = get_object_or_404(Merchant, user=request.user)
+                if merchant_customer.merchant != merchant:
+                    raise PermissionDenied("You can only manage your own customers")
+
+            merchant_customer.status = 'suspended'
+            merchant_customer.suspended_at = timezone.now()
+            merchant_customer.suspended_by = request.user
+            merchant_customer.suspension_reason = request.data.get('reason', '')
+            merchant_customer.save()
+
+            serializer = self.get_serializer(merchant_customer)
+            return APIResponse(serializer.data)
+        except Exception as e:
+            return APIResponse({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=['post'])
+    def activate(self, request, pk=None):
+        """Activate a suspended merchant customer"""
+        try:
+            merchant_customer = self.get_object()
+
+            # Only merchant or admin can activate
+            if request.user.user_type == 2:
+                merchant = get_object_or_404(Merchant, user=request.user)
+                if merchant_customer.merchant != merchant:
+                    raise PermissionDenied("You can only manage your own customers")
+
+            merchant_customer.status = 'active'
+            merchant_customer.suspended_at = None
+            merchant_customer.suspended_by = None
+            merchant_customer.suspension_reason = ''
+            merchant_customer.save()
+
+            serializer = self.get_serializer(merchant_customer)
+            return APIResponse(serializer.data)
+        except Exception as e:
+            return APIResponse({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class MerchantKYCSubmissionViewSet(viewsets.ModelViewSet):
+    """ViewSet for managing KYC submissions that need admin review"""
+    serializer_class = MerchantKYCSubmissionSerializer
+    permission_classes = [IsAdminUser]
+
+    def get_queryset(self):
+        queryset = MerchantKYCSubmission.objects.select_related(
+            'merchant_customer__merchant__user',
+            'merchant_customer__customer__user',
+            'kyc_document',
+            'reviewed_by'
+        )
+
+        # Apply filters
+        status_filter = self.request.query_params.get('status', 'pending')
+        priority = self.request.query_params.get('priority')
+        merchant_id = self.request.query_params.get('merchant_id')
+        days_pending = self.request.query_params.get('days_pending')
+
+        if status_filter != 'all':
+            queryset = queryset.filter(status=status_filter)
+        if priority:
+            queryset = queryset.filter(review_priority=priority)
+        if merchant_id:
+            queryset = queryset.filter(merchant_customer__merchant_id=merchant_id)
+        if days_pending:
+            from django.db.models import F, Value
+            from django.db.models.functions import Now
+            queryset = queryset.filter(
+                submitted_at__lte=Now() - Value(int(days_pending)) * Value(1)  # days
+            )
+
+        return queryset.order_by('-submitted_at')
+
+    @action(detail=True, methods=['post'])
+    def approve(self, request, pk=None):
+        """Approve a KYC submission"""
+        try:
+            submission = self.get_object()
+            result = KYCService.process_admin_kyc_decision(
+                submission=submission,
+                decision='approved',
+                admin_user=request.user,
+                admin_notes=request.data.get('notes', '')
+            )
+            serializer = self.get_serializer(result)
+            return APIResponse(serializer.data)
+        except Exception as e:
+            return APIResponse({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=['post'])
+    def reject(self, request, pk=None):
+        """Reject a KYC submission"""
+        try:
+            submission = self.get_object()
+            result = KYCService.process_admin_kyc_decision(
+                submission=submission,
+                decision='rejected',
+                admin_user=request.user,
+                admin_notes=request.data['reason']
+            )
+            serializer = self.get_serializer(result)
+            return APIResponse(serializer.data)
+        except Exception as e:
+            return APIResponse({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=['post'])
+    def escalate(self, request, pk=None):
+        """Escalate a KYC submission for further review"""
+        try:
+            submission = self.get_object()
+            result = KYCService.process_admin_kyc_decision(
+                submission=submission,
+                decision='escalated',
+                admin_user=request.user,
+                admin_notes=request.data.get('notes', '')
+            )
+            serializer = self.get_serializer(result)
+            return APIResponse(serializer.data)
+        except Exception as e:
+            return APIResponse({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=False, methods=['post'])
+    def bulk_decide(self, request):
+        """Process multiple KYC decisions in bulk"""
+        try:
+            results = KYCService.bulk_process_kyc_decisions(
+                submissions_data=request.data['submissions'],
+                admin_user=request.user
+            )
+            return APIResponse({'results': results})
+        except Exception as e:
+            return APIResponse({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=False, methods=['get'])
+    def stats(self, request):
+        """Get KYC submission statistics"""
+        try:
+            queryset = self.get_queryset()
+            total = queryset.count()
+            pending = queryset.filter(status='pending').count()
+            approved = queryset.filter(status='approved').count()
+            rejected = queryset.filter(status='rejected').count()
+            escalated = queryset.filter(status='escalated').count()
+
+            # Priority breakdown
+            from django.db.models import Count
+            priority_stats = queryset.values('review_priority').annotate(
+                count=Count('id')
+            ).order_by('review_priority')
+
+            return APIResponse({
+                'total': total,
+                'pending': pending,
+                'approved': approved,
+                'rejected': rejected,
+                'escalated': escalated,
+                'priority_breakdown': list(priority_stats)
+            })
+        except Exception as e:
+            return APIResponse({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class AdminKYCInboxPagination(PageNumberPagination):
+    page_size = 20
+    page_size_query_param = 'page_size'
+    max_page_size = 100
+
+
+class AdminKYCInboxView(APIView):
+    permission_classes = [IsAdminUser]
+
+    def _normalize_merchant_submission(self, submission: MerchantKYCSubmission):
+        serialized = MerchantKYCSubmissionSerializer(submission).data
+        return {
+            'id': f"merchant_customer:{submission.id}",
+            'subject_type': 'merchant_customer',
+            'source_id': submission.id,
+            'status': submission.status,
+            'submitted_at': submission.submitted_at,
+            'review_priority': submission.review_priority,
+            'risk_score': submission.risk_score,
+            'risk_factors': submission.risk_factors,
+            'escalation_reason': submission.escalation_reason,
+            'merchant_customer': serialized.get('merchant_customer'),
+            'customer': None,
+            'kyc_document': serialized.get('kyc_document'),
+            'reviewed_by': serialized.get('reviewed_by'),
+            'reviewed_at': submission.reviewed_at,
+            'admin_notes': submission.admin_notes,
+            'days_pending': submission.days_pending,
+        }
+
+    def _normalize_direct_customer_document(self, document: KYCDocument):
+        normalized_status = 'pending'
+        if document.status == 'APPROVED':
+            normalized_status = 'approved'
+        elif document.status == 'REJECTED':
+            normalized_status = 'rejected'
+
+        customer_data = None
+        try:
+            customer = document.user.customer_profile
+            customer_data = CustomerSerializer(customer).data
+        except Exception:
+            customer_data = None
+
+        return {
+            'id': f"direct_customer:{document.id}",
+            'subject_type': 'direct_customer',
+            'source_id': document.id,
+            'status': normalized_status,
+            'submitted_at': document.created_at,
+            'review_priority': None,
+            'risk_score': 0,
+            'risk_factors': [],
+            'escalation_reason': '',
+            'merchant_customer': None,
+            'customer': customer_data,
+            'kyc_document': KYCDocumentSerializer(document).data,
+            'reviewed_by': UserSerializer(document.reviewed_by).data if document.reviewed_by else None,
+            'reviewed_at': document.reviewed_at,
+            'admin_notes': '',
+            'days_pending': None,
+        }
+
+    def get(self, request):
+        status_filter = request.query_params.get('status', 'pending')
+        subject_filter = request.query_params.get('subject', 'all')
+
+        items = []
+
+        if subject_filter in ['all', 'merchant_customer']:
+            merchant_qs = MerchantKYCSubmission.objects.select_related(
+                'merchant_customer__merchant__user',
+                'merchant_customer__customer__user',
+                'kyc_document',
+                'reviewed_by'
+            )
+            if status_filter != 'all':
+                merchant_qs = merchant_qs.filter(status=status_filter)
+            items.extend([self._normalize_merchant_submission(s) for s in merchant_qs])
+
+        if subject_filter in ['all', 'direct_customer']:
+            direct_qs = KYCDocument.objects.select_related('user', 'reviewed_by').filter(
+                user__customer_profile__isnull=False
+            )
+
+            if status_filter == 'pending':
+                direct_qs = direct_qs.filter(status='PENDING')
+            elif status_filter == 'approved':
+                direct_qs = direct_qs.filter(status='APPROVED')
+            elif status_filter == 'rejected':
+                direct_qs = direct_qs.filter(status='REJECTED')
+            elif status_filter == 'escalated':
+                direct_qs = direct_qs.none()
+
+            items.extend([self._normalize_direct_customer_document(d) for d in direct_qs])
+
+        items.sort(key=lambda x: x['submitted_at'], reverse=True)
+
+        paginator = AdminKYCInboxPagination()
+        page = paginator.paginate_queryset(items, request)
+
+        def _serialize_item(item):
+            item = dict(item)
+            if item.get('submitted_at'):
+                item['submitted_at'] = item['submitted_at'].isoformat()
+            if item.get('reviewed_at'):
+                item['reviewed_at'] = item['reviewed_at'].isoformat()
+            return item
+
+        return APIResponse({
+            'count': len(items),
+            'results': [_serialize_item(i) for i in (page or [])]
+        })
+
+
+class AdminKYCInboxStatsView(APIView):
+    permission_classes = [IsAdminUser]
+
+    def get(self, request):
+        merchant_qs = MerchantKYCSubmission.objects.all()
+        m_total = merchant_qs.count()
+        m_pending = merchant_qs.filter(status='pending').count()
+        m_approved = merchant_qs.filter(status='approved').count()
+        m_rejected = merchant_qs.filter(status='rejected').count()
+        m_escalated = merchant_qs.filter(status='escalated').count()
+
+        direct_qs = KYCDocument.objects.filter(user__customer_profile__isnull=False)
+        d_total = direct_qs.count()
+        d_pending = direct_qs.filter(status='PENDING').count()
+        d_approved = direct_qs.filter(status='APPROVED').count()
+        d_rejected = direct_qs.filter(status='REJECTED').count()
+
+        return APIResponse({
+            'total': m_total + d_total,
+            'pending': m_pending + d_pending,
+            'approved': m_approved + d_approved,
+            'rejected': m_rejected + d_rejected,
+            'escalated': m_escalated,
+            'by_subject': {
+                'merchant_customer': {
+                    'total': m_total,
+                    'pending': m_pending,
+                    'approved': m_approved,
+                    'rejected': m_rejected,
+                    'escalated': m_escalated,
+                },
+                'direct_customer': {
+                    'total': d_total,
+                    'pending': d_pending,
+                    'approved': d_approved,
+                    'rejected': d_rejected,
+                    'escalated': 0,
+                }
+            }
+        })
 
 
 def verify_email(request, token):

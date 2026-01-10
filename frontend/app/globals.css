@@ -1,66 +1,640 @@
 @import "tailwindcss";
 
-@layer base {
-  :root {
-    --background: 0 0% 100%;
-    --foreground: 224 71.4% 4.1%;
-    --card: 0 0% 100%;
-    --card-foreground: 224 71.4% 4.1%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 224 71.4% 4.1%;
-    --primary: 262.1 83.3% 57.8%;
-    --primary-foreground: 210 20% 98%;
-    --secondary: 220 14.3% 95.9%;
-    --secondary-foreground: 220.9 39.3% 11%;
-    --muted: 220 14.3% 95.9%;
-    --muted-foreground: 220 8.9% 46.1%;
-    --accent: 220 14.3% 95.9%;
-    --accent-foreground: 220.9 39.3% 11%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 20% 98%;
-    --border: 220 13% 91%;
-    --input: 220 13% 91%;
-    --ring: 262.1 83.3% 57.8%;
-    --radius: 0.5rem;
-  }
+@theme {
+  --color-background: hsl(0 0% 98%);
+  --color-foreground: hsl(240 10% 3.9%);
+  --color-card: hsl(0 0% 100%);
+  --color-card-foreground: hsl(240 10% 3.9%);
+  --color-popover: hsl(0 0% 100%);
+  --color-popover-foreground: hsl(240 10% 3.9%);
+  --color-primary: hsl(250 84% 54%);
+  --color-primary-foreground: hsl(0 0% 100%);
+  --color-secondary: hsl(240 4.8% 95.9%);
+  --color-secondary-foreground: hsl(240 5.9% 10%);
+  --color-muted: hsl(240 4.8% 95.9%);
+  --color-muted-foreground: hsl(240 3.8% 46.1%);
+  --color-accent: hsl(240 4.8% 95.9%);
+  --color-accent-foreground: hsl(240 5.9% 10%);
+  --color-destructive: hsl(0 84.2% 60.2%);
+  --color-destructive-foreground: hsl(0 0% 100%);
+  --color-border: hsl(240 5.9% 90%);
+  --color-input: hsl(240 5.9% 90%);
+  --color-ring: hsl(250 84% 54%);
+  --radius: 0.75rem;
+  --shadow-revolut: 0 4px 24px -4px hsl(250 84% 54% / 0.25);
+  --shadow-revolut-lg: 0 8px 40px -8px hsl(250 84% 54% / 0.3);
+}
 
-  * {
-    border-color: hsl(var(--border));
-  }
+/* SikaRemit - Revolut-Inspired Design System */
 
-  body {
-    background-color: hsl(var(--background));
-    color: hsl(var(--foreground));
+:root {
+  --background: 0 0% 98%;
+  --foreground: 240 10% 3.9%;
+  --card: 0 0% 100%;
+  --card-foreground: 240 10% 3.9%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 240 10% 3.9%;
+  --primary: 250 84% 54%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 240 4.8% 95.9%;
+  --secondary-foreground: 240 5.9% 10%;
+  --muted: 240 4.8% 95.9%;
+  --muted-foreground: 240 3.8% 46.1%;
+  --accent: 240 4.8% 95.9%;
+  --accent-foreground: 240 5.9% 10%;
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 240 5.9% 90%;
+  --input: 240 5.9% 90%;
+  --ring: 250 84% 54%;
+}
+
+.dark {
+  --background: 240 10% 4%;
+  --foreground: 0 0% 98%;
+  --card: 240 10% 6%;
+  --card-foreground: 0 0% 98%;
+  --popover: 240 10% 6%;
+  --popover-foreground: 0 0% 98%;
+  --primary: 250 84% 60%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 240 5% 15%;
+  --secondary-foreground: 0 0% 98%;
+  --muted: 240 5% 15%;
+  --muted-foreground: 240 5% 65%;
+  --accent: 240 5% 15%;
+  --accent-foreground: 0 0% 98%;
+  --destructive: 0 62.8% 50%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 240 5% 18%;
+  --input: 240 5% 18%;
+  --ring: 250 84% 60%;
+}
+
+* {
+  border-color: hsl(var(--border));
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-feature-settings: "rlig" 1, "calt" 1;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted-foreground) / 0.3);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.5);
+}
+
+/* Revolut Component Classes - Using direct CSS instead of @apply for custom colors */
+
+.revolut-card {
+  background-color: hsl(var(--card));
+  border-radius: 1rem;
+  border: 1px solid hsl(var(--border) / 0.5);
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
+  transition: all 0.2s;
+}
+
+.revolut-card:hover {
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+  border-color: hsl(var(--border));
+}
+
+.revolut-glass {
+  background-color: hsl(var(--card) / 0.8);
+  backdrop-filter: blur(24px);
+  border-radius: 1rem;
+  border: 1px solid hsl(var(--border) / 0.3);
+}
+
+.revolut-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.75rem;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.revolut-btn:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+}
+
+.revolut-btn:disabled {
+  pointer-events: none;
+  opacity: 0.5;
+}
+
+.revolut-btn-primary {
+  background-color: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  box-shadow: 0 10px 15px -3px hsl(var(--primary) / 0.25);
+}
+
+.revolut-btn-primary:hover {
+  background-color: hsl(var(--primary) / 0.9);
+  box-shadow: 0 20px 25px -5px hsl(var(--primary) / 0.3);
+}
+
+.revolut-btn-secondary {
+  background-color: hsl(var(--secondary));
+  color: hsl(var(--secondary-foreground));
+}
+
+.revolut-btn-secondary:hover {
+  background-color: hsl(var(--secondary) / 0.8);
+}
+
+.revolut-btn-ghost:hover {
+  background-color: hsl(var(--accent));
+  color: hsl(var(--accent-foreground));
+}
+
+.revolut-input {
+  display: flex;
+  height: 3rem;
+  width: 100%;
+  border-radius: 0.75rem;
+  border: 1px solid hsl(var(--input));
+  background-color: hsl(var(--background));
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  transition: all 0.2s;
+}
+
+.revolut-input::placeholder {
+  color: hsl(var(--muted-foreground));
+}
+
+.revolut-input:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 0;
+  border-color: hsl(var(--primary));
+}
+
+.revolut-input:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.revolut-section {
+  padding-top: 4rem;
+  padding-bottom: 4rem;
+}
+
+@media (min-width: 768px) {
+  .revolut-section {
+    padding-top: 6rem;
+    padding-bottom: 6rem;
   }
 }
 
-@layer utilities {
-  /* Force modern colors to be applied */
-  .bg-payglobe-primary {
-    background-color: #8b5cf6 !important; /* Purple */
-  }
+.revolut-container {
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
 
-  .text-payglobe-primary {
-    color: #8b5cf6 !important; /* Purple */
+@media (min-width: 768px) {
+  .revolut-container {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
   }
+}
 
-  .bg-payglobe-card {
-    background-color: #ffffff !important; /* White */
+@media (min-width: 1024px) {
+  .revolut-container {
+    padding-left: 2rem;
+    padding-right: 2rem;
+    max-width: 1280px;
   }
+}
 
-  .text-payglobe-foreground {
-    color: #1f2937 !important; /* Dark gray */
-  }
+.revolut-heading {
+  font-size: 1.875rem;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+}
 
-  .bg-payglobe-accent {
-    background-color: #f3f4f6 !important; /* Light gray */
+@media (min-width: 768px) {
+  .revolut-heading {
+    font-size: 2.25rem;
   }
+}
 
-  .text-payglobe-muted {
-    color: #6b7280 !important; /* Medium gray */
+@media (min-width: 1024px) {
+  .revolut-heading {
+    font-size: 3rem;
   }
+}
 
-  .border-payglobe-border {
-    border-color: #e5e7eb !important; /* Light border */
+.revolut-subheading {
+  font-size: 1.125rem;
+  color: hsl(var(--muted-foreground));
+}
+
+@media (min-width: 768px) {
+  .revolut-subheading {
+    font-size: 1.25rem;
   }
+}
+
+.revolut-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 9999px;
+  padding: 0.25rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  background-color: hsl(var(--primary) / 0.1);
+  color: hsl(var(--primary));
+}
+
+.revolut-gradient-text {
+  background: linear-gradient(to right, hsl(var(--primary)), hsl(280 84% 60%), hsl(330 84% 60%));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.revolut-stat {
+  background-color: hsl(var(--card));
+  border-radius: 1rem;
+  border: 1px solid hsl(var(--border) / 0.5);
+  padding: 1.5rem;
+  text-align: center;
+}
+
+.revolut-stat-value {
+  font-size: 1.875rem;
+  font-weight: 700;
+  color: hsl(var(--foreground));
+}
+
+@media (min-width: 768px) {
+  .revolut-stat-value {
+    font-size: 2.25rem;
+  }
+}
+
+.revolut-stat-label {
+  font-size: 0.875rem;
+  color: hsl(var(--muted-foreground));
+  margin-top: 0.25rem;
+}
+
+.revolut-nav {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  width: 100%;
+  border-bottom: 1px solid hsl(var(--border) / 0.4);
+  background-color: hsl(var(--background) / 0.8);
+  backdrop-filter: blur(24px);
+}
+
+.revolut-nav-link {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: hsl(var(--muted-foreground));
+  transition: color 0.2s;
+}
+
+.revolut-nav-link:hover {
+  color: hsl(var(--foreground));
+}
+
+.revolut-nav-link-active {
+  color: hsl(var(--foreground));
+}
+
+.revolut-sidebar {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 40;
+  height: 100vh;
+  width: 16rem;
+  border-right: 1px solid hsl(var(--border));
+  background-color: hsl(var(--card));
+}
+
+.revolut-sidebar-link {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  border-radius: 0.75rem;
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: hsl(var(--muted-foreground));
+  transition: all 0.2s;
+}
+
+.revolut-sidebar-link:hover {
+  background-color: hsl(var(--accent));
+  color: hsl(var(--foreground));
+}
+
+.revolut-sidebar-link-active {
+  background-color: hsl(var(--primary) / 0.1);
+  color: hsl(var(--primary));
+}
+
+.revolut-sidebar-link-active:hover {
+  background-color: hsl(var(--primary) / 0.15);
+}
+
+.revolut-dashboard-card {
+  background-color: hsl(var(--card));
+  border-radius: 1rem;
+  border: 1px solid hsl(var(--border) / 0.5);
+  padding: 1.5rem;
+}
+
+.revolut-balance-card {
+  position: relative;
+  overflow: hidden;
+  border-radius: 1rem;
+  padding: 1.5rem;
+  background: linear-gradient(to bottom right, hsl(var(--primary)), hsl(280 84% 50%), hsl(330 84% 50%));
+  color: white;
+  box-shadow: 0 25px 50px -12px hsl(var(--primary) / 0.3);
+}
+
+@media (min-width: 768px) {
+  .revolut-balance-card {
+    padding: 2rem;
+  }
+}
+
+.revolut-quick-action {
+  background-color: hsl(var(--card));
+  border-radius: 1rem;
+  border: 1px solid hsl(var(--border) / 0.5);
+  padding: 1rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.revolut-quick-action:hover {
+  border-color: hsl(var(--primary) / 0.5);
+  box-shadow: 0 10px 15px -3px hsl(var(--primary) / 0.1);
+}
+
+.revolut-quick-action-icon {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: hsl(var(--primary) / 0.1);
+  color: hsl(var(--primary));
+  transition: all 0.2s;
+}
+
+.revolut-quick-action:hover .revolut-quick-action-icon {
+  background-color: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  transform: scale(1.1);
+}
+
+.revolut-transaction {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem;
+  border-radius: 0.75rem;
+  background-color: hsl(var(--muted) / 0.5);
+  transition: background-color 0.2s;
+}
+
+.revolut-transaction:hover {
+  background-color: hsl(var(--muted));
+}
+
+.revolut-table {
+  width: 100%;
+  font-size: 0.875rem;
+}
+
+.revolut-table th {
+  padding: 0.75rem 1rem;
+  text-align: left;
+  font-weight: 500;
+  color: hsl(var(--muted-foreground));
+  border-bottom: 1px solid hsl(var(--border));
+}
+
+.revolut-table td {
+  padding: 1rem;
+  border-bottom: 1px solid hsl(var(--border) / 0.5);
+}
+
+.revolut-table tr:hover td {
+  background-color: hsl(var(--muted) / 0.3);
+}
+
+.revolut-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: hsl(var(--background) / 0.8);
+  backdrop-filter: blur(4px);
+}
+
+.revolut-modal-content {
+  background-color: hsl(var(--card));
+  border-radius: 1rem;
+  border: 1px solid hsl(var(--border) / 0.5);
+  width: 100%;
+  max-width: 32rem;
+  padding: 1.5rem;
+  box-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.25);
+}
+
+.revolut-fade-in {
+  animation: revolut-fade-in 0.3s ease-out;
+}
+
+.revolut-slide-up {
+  animation: revolut-slide-up 0.4s ease-out;
+}
+
+.revolut-scale-in {
+  animation: revolut-scale-in 0.2s ease-out;
+}
+
+@keyframes revolut-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes revolut-slide-up {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes revolut-scale-in {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.revolut-skeleton {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  border-radius: 0.5rem;
+  background-color: hsl(var(--muted));
+}
+
+.revolut-divider {
+  height: 1px;
+  width: 100%;
+  background-color: hsl(var(--border));
+}
+
+.revolut-avatar {
+  position: relative;
+  display: flex;
+  height: 2.5rem;
+  width: 2.5rem;
+  flex-shrink: 0;
+  overflow: hidden;
+  border-radius: 9999px;
+  background-color: hsl(var(--muted));
+}
+
+.revolut-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  border-radius: 9999px;
+  padding: 0.125rem 0.625rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.revolut-status-success {
+  background-color: hsl(142 76% 36% / 0.1);
+  color: hsl(142 76% 36%);
+}
+
+.revolut-status-warning {
+  background-color: hsl(38 92% 50% / 0.1);
+  color: hsl(38 92% 50%);
+}
+
+.revolut-status-error {
+  background-color: hsl(0 84% 60% / 0.1);
+  color: hsl(0 84% 60%);
+}
+
+.revolut-status-pending {
+  background-color: hsl(217 91% 60% / 0.1);
+  color: hsl(217 91% 60%);
+}
+
+/* Utility classes */
+.bg-revolut-gradient {
+  background: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(280 84% 54%) 100%);
+}
+
+.bg-revolut-gradient-subtle {
+  background: linear-gradient(135deg, hsl(var(--primary) / 0.1) 0%, hsl(280 84% 54% / 0.1) 100%);
+}
+
+.text-revolut-gradient {
+  background: linear-gradient(to right, hsl(var(--primary)), hsl(280 84% 60%), hsl(330 84% 60%));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.border-revolut-gradient {
+  border-image: linear-gradient(135deg, hsl(var(--primary)), hsl(280 84% 54%)) 1;
+}
+
+/* Legacy SikaRemit classes - mapped to new system */
+.bg-sikaremit-primary {
+  background-color: hsl(var(--primary));
+}
+
+.text-sikaremit-primary {
+  color: hsl(var(--primary));
+}
+
+.bg-sikaremit-card {
+  background-color: hsl(var(--card));
+}
+
+.text-sikaremit-foreground {
+  color: hsl(var(--foreground));
+}
+
+.bg-sikaremit-accent {
+  background-color: hsl(var(--accent));
+}
+
+.text-sikaremit-muted {
+  color: hsl(var(--muted-foreground));
+}
+
+.border-sikaremit-border {
+  border-color: hsl(var(--border));
+}
+
+/* Hover effects */
+.hover-lift {
+  transition: transform 0.2s;
+}
+
+.hover-lift:hover {
+  transform: translateY(-0.25rem);
+}
+
+.hover-scale {
+  transition: transform 0.2s;
+}
+
+.hover-scale:hover {
+  transform: scale(1.05);
+}
+
+.hover-glow {
+  transition: box-shadow 0.2s;
+}
+
+.hover-glow:hover {
+  box-shadow: 0 4px 24px -4px hsl(var(--primary) / 0.25);
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
 }

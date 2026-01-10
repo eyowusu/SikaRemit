@@ -6,7 +6,7 @@ from ..serializers import PayoutSerializer
 from django.utils import timezone
 
 class MerchantPayoutsAPIView(APIView):
-    permission_classes = [permissions.IsAdminUser]
+    permission_classes = [permissions.IsAuthenticated]  # Allow authenticated merchants
     
     def get(self, request):
         payouts = Payout.objects.filter(status='pending').select_related('merchant')

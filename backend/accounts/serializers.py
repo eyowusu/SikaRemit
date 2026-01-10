@@ -1,6 +1,9 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
-from .models import AdminActivity, BackupVerification, PasswordResetToken, AuthLog, Transaction, Product, Session, User, Customer, Merchant, Notification, Payout
+from .models import AdminActivity, BackupVerification, PasswordResetToken, AuthLog, Transaction, Session, Payout, SupportTicket, SupportMessage, Recipient
+from users.models import User, Customer, Merchant
+from merchants.models import Product
+from notifications.models import Notification
 from payments.models.payment_log import PaymentLog
 from payments.models.cross_border import CrossBorderRemittance
 from payments.models.payment import Payment
@@ -15,35 +18,27 @@ class UserRegisterSerializer(serializers.Serializer):
     password = serializers.CharField(
         write_only=True,
         required=True,
-        validators=[]
+        allow_blank=True
     )
-    password2 = serializers.CharField(write_only=True, required=True)
+    password2 = serializers.CharField(write_only=True, required=True, allow_blank=True)
     user_type = serializers.IntegerField(required=True)
-    username = serializers.CharField(required=False)
-    first_name = serializers.CharField(required=False)
-    last_name = serializers.CharField(required=False)
-    phone = serializers.CharField(required=False)
+    username = serializers.CharField(required=False, allow_blank=True)
+    first_name = serializers.CharField(required=False, allow_blank=True)
+    last_name = serializers.CharField(required=False, allow_blank=True)
+    phone = serializers.CharField(required=False, allow_blank=True)
 
     def validate(self, attrs):
         if attrs['password'] != attrs['password2']:
             raise serializers.ValidationError({"password": "Passwords don't match"})
-        return attrs
-
-    def validate_password(self, value):
-        errors = []
-        for validator_config in []:
-            try:
-                validator = import_string(validator_config['NAME'])(**validator_config.get('OPTIONS', {}))
-                validator.validate(value)
-            except ValidationError as e:
-                errors.append({
-                    'code': e.code,
-                    'message': str(e)
-                })
         
-        if errors:
-            raise serializers.ValidationError(errors)
-        return value
+        # SECURITY: Only allow customer and merchant account creation through public registration
+        # Admin accounts should only be created through admin-only endpoints
+        if attrs['user_type'] not in [2, 3]:  # 2 = merchant, 3 = customer
+            raise serializers.ValidationError({
+                "user_type": "Invalid user type. Only customer and merchant accounts can be created through public registration."
+            })
+        
+        return attrs
 
 class UserLoginSerializer(serializers.Serializer):
     email = serializers.EmailField(required=True)
@@ -54,24 +49,28 @@ class UserLoginSerializer(serializers.Serializer):
         password = attrs.get('password')
         
         if email and password:
-            from django.contrib.auth import authenticate
             from django.contrib.auth import get_user_model
             
             User = get_user_model()
             
-            # Try to authenticate with the given email and password
-            user = authenticate(request=self.context.get('request'), 
-                              username=email,  # Using email as username
-                              password=password)
-            
-            if not user:
-                # If authentication fails, try to find the user by email first
-                try:
-                    user = User.objects.get(email=email)
-                    if not user.check_password(password):
-                        raise serializers.ValidationError('Invalid email or password.')
-                except User.DoesNotExist:
+            # Find user by email - handle potential duplicates
+            try:
+                # First try to get a single user
+                user = User.objects.get(email=email)
+            except User.MultipleObjectsReturned:
+                # If multiple users exist with same email, get the first active verified one
+                user = User.objects.filter(email=email, is_active=True, is_verified=True).first()
+                if not user:
+                    # If no active verified user found, get the first one (for backward compatibility)
+                    user = User.objects.filter(email=email).first()
+                if not user:
                     raise serializers.ValidationError('Invalid email or password.')
+            except User.DoesNotExist:
+                raise serializers.ValidationError('Invalid email or password.')
+            
+            # Check password
+            if not user.check_password(password):
+                raise serializers.ValidationError('Invalid email or password.')
             
             if not user.is_active:
                 raise serializers.ValidationError('User account is disabled.')
@@ -86,6 +85,7 @@ class UserLoginSerializer(serializers.Serializer):
 
 class AccountsUserSerializer(serializers.ModelSerializer):
     role = serializers.SerializerMethodField()
+    created_at = serializers.DateTimeField(source='date_joined', read_only=True)
     
     def get_role(self, obj):
         role_mapping = {
@@ -97,8 +97,8 @@ class AccountsUserSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'phone', 'role', 'is_verified']
-        read_only_fields = ['id', 'role', 'is_verified']
+        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'phone', 'role', 'user_type', 'is_verified', 'is_active', 'created_at']
+        read_only_fields = ['id', 'role', 'is_verified', 'created_at']
         component_name = 'AccountsUser'
 
 class AccountsTransactionSerializer(serializers.ModelSerializer):
@@ -110,6 +110,28 @@ class AccountsTransactionSerializer(serializers.ModelSerializer):
         fields = '__all__'
         read_only_fields = ['created_at', 'completed_at']
         component_name = 'AccountsTransaction'
+
+class PaymentsTransactionSerializer(serializers.ModelSerializer):
+    customer_email = serializers.EmailField(source='customer.user.email', read_only=True)
+    merchant_email = serializers.EmailField(source='merchant.user.email', read_only=True)
+    payment_method_name = serializers.CharField(source='payment_method.name', read_only=True)
+    
+    class Meta:
+        model = Transaction
+        fields = ['id', 'customer', 'customer_email', 'merchant', 'merchant_email', 'amount', 'currency', 'status', 'payment_method', 'payment_method_name', 'created_at', 'updated_at']
+        read_only_fields = ['created_at', 'updated_at']
+        component_name = 'PaymentsTransaction'
+
+class PaymentSerializer(serializers.ModelSerializer):
+    customer_email = serializers.EmailField(source='customer.user.email', read_only=True)
+    merchant_email = serializers.EmailField(source='merchant.user.email', read_only=True, allow_null=True)
+    payment_method_name = serializers.CharField(source='payment_method.name', read_only=True)
+    
+    class Meta:
+        model = Payment
+        fields = ['id', 'customer', 'customer_email', 'merchant', 'merchant_email', 'amount', 'currency', 'status', 'payment_method', 'payment_method_name', 'reference', 'created_at', 'updated_at', 'payment_type', 'bill_issuer', 'bill_reference', 'due_date']
+        read_only_fields = ['created_at', 'updated_at']
+        component_name = 'Payment'
 
 class AdminActivitySerializer(serializers.ModelSerializer):
     admin_email = serializers.EmailField(source='admin.email', read_only=True)
@@ -354,3 +376,65 @@ class PayoutSerializer(serializers.ModelSerializer):
         extra_kwargs = {
             'merchant': {'write_only': True}
         }
+
+class SupportMessageSerializer(serializers.ModelSerializer):
+    user_name = serializers.CharField(source='user.get_full_name', read_only=True)
+    user_email = serializers.EmailField(source='user.email', read_only=True)
+    
+    class Meta:
+        model = SupportMessage
+        fields = ['id', 'user', 'user_name', 'user_email', 'message', 'is_staff', 'created_at']
+        read_only_fields = ['id', 'created_at']
+
+class SupportTicketSerializer(serializers.ModelSerializer):
+    messages = SupportMessageSerializer(many=True, read_only=True)
+    user_name = serializers.CharField(source='user.get_full_name', read_only=True)
+    user_email = serializers.EmailField(source='user.email', read_only=True)
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    priority_display = serializers.CharField(source='get_priority_display', read_only=True)
+    
+    class Meta:
+        model = SupportTicket
+        fields = [
+            'id', 'user', 'user_name', 'user_email', 'subject', 'description', 
+            'status', 'status_display', 'priority', 'priority_display', 
+            'created_at', 'updated_at', 'messages'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at', 'user']
+
+class CreateSupportTicketSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SupportTicket
+        fields = ['subject', 'description', 'priority']
+    
+    def create(self, validated_data):
+        validated_data['user'] = self.context['request'].user
+        return super().create(validated_data)
+
+class CreateSupportMessageSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SupportMessage
+        fields = ['message']
+    
+    def create(self, validated_data):
+        validated_data['user'] = self.context['request'].user
+        validated_data['ticket'] = self.context['ticket']
+        return super().create(validated_data)
+
+class RecipientSerializer(serializers.ModelSerializer):
+    type = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Recipient
+        fields = ['id', 'name', 'phone', 'email', 'accountNumber', 'bankName', 'mobileProvider', 'type']
+        read_only_fields = ['id']
+
+    def get_type(self, obj):
+        return obj.recipient_type
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        # Map model fields to frontend expected field names
+        data['accountNumber'] = instance.account_number
+        data['bankName'] = instance.bank_name
+        return data

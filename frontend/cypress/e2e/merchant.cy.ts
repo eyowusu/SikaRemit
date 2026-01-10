@@ -10,7 +10,7 @@ describe('Merchant Authentication', () => {
 
   it('merchant login sets authentication tokens', () => {
     cy.loginAsMerchant()
-    cy.window().then((win) => {
+    cy.window().then((win: Window) => {
       expect(win.localStorage.getItem('next-auth.session-token')).to.exist
       expect(win.localStorage.getItem('authToken')).to.exist
     })

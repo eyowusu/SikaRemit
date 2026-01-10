@@ -11,8 +11,13 @@ class PaymentsConfig(AppConfig):
         # Import models
         from .models.verification import VerificationLog, ProviderHealth
         
-        # Import signals
+        # Connect signals
         from . import signals
+        signals.connect_signals()
+        
+        # Connect webhook signals
+        from .webhooks import connect_signals
+        connect_signals()
         
         # Ensure static files are collected
         from django.contrib.staticfiles.finders import find

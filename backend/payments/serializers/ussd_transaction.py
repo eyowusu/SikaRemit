@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from ..models.ussd_transaction import USSDTransaction
+from ..models.ussd_transaction import SimpleUSSDTransaction as USSDTransaction
 
 class USSDTransactionSerializer(serializers.ModelSerializer):
     class Meta:

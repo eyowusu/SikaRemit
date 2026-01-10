@@ -22,9 +22,8 @@ export function usePayoutWebhooks(
         }
         
         const verified = await verifyWebhook(
-          event.data,
           event.data.signature,
-          secret || process.env.WEBHOOK_SECRET || ''
+          event.data
         )
         
         switch (verified.event_type) {

@@ -1,26 +1,43 @@
 from rest_framework.response import Response
-from rest_framework import status, viewsets
+from rest_framework import status
+from rest_framework.decorators import action
 from django.contrib.auth import get_user_model
-from .serializers import AccountsUserSerializer, UserRegisterSerializer, UserLoginSerializer, PasswordResetTokenSerializer, AuthLogSerializer, AccountsTransactionSerializer, ProductSerializer, MerchantProductSerializer, ProductInventorySerializer, SubscriptionPaymentSerializer, RemittancePaymentSerializer, BillPaymentSerializer, CheckoutSerializer, PaymentLogSerializer
-from core.permissions import IsAdminUser
-from payments.models.transaction import Transaction
-from payments.models.cross_border import CrossBorderRemittance
-from payments.models.payment import Payment
-from payments.models.payment_log import PaymentLog
+from django.utils import timezone
+from .serializers import (
+    UserLoginSerializer, UserRegisterSerializer, AccountsUserSerializer,
+    CheckoutSerializer, AccountsTransactionSerializer, PaymentsTransactionSerializer, AdminActivitySerializer,
+    BackupVerificationSerializer, SessionSerializer, PasswordResetTokenSerializer,
+    AuthLogSerializer, PaymentSerializer, PaymentLogSerializer, ProductSerializer,
+    ProductInventorySerializer, MerchantProductSerializer, RemittancePaymentSerializer,
+    BillPaymentSerializer, SubscriptionPaymentSerializer, CustomerSerializer,
+    MerchantSerializer, NotificationSerializer, PayoutSerializer,
+    SupportTicketSerializer, SupportMessageSerializer, CreateSupportTicketSerializer, CreateSupportMessageSerializer
+)
 from rest_framework.views import APIView
-from .services import AuthService
-from .models import PasswordResetToken, AuthLog, Product
-from rest_framework.permissions import IsAuthenticated
-from datetime import datetime
-import requests
-from django.conf import settings
+from rest_framework_simplejwt.tokens import RefreshToken, AccessToken
+from rest_framework_simplejwt.authentication import JWTAuthentication
+from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import csrf_exempt
 import logging
-from django.db import models
 from functools import wraps
-from rest_framework_simplejwt.tokens import AccessToken
-from django.core.cache import cache
 
 logger = logging.getLogger(__name__)
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from .permissions import IsAdminUser
+from rest_framework import viewsets
+from .models import (
+    AdminActivity, BackupVerification, PasswordResetToken, AuthLog,
+    Transaction, Session, Payout, SupportTicket, SupportMessage
+)
+from merchants.models import Product
+from notifications.models import Notification
+from payments.models.payment import Payment
+from payments.models.payment_log import PaymentLog
+from .services import AuthService
+from django.conf import settings
+from decimal import Decimal
+from datetime import datetime
+import requests
 
 User = get_user_model()
 
@@ -47,7 +64,7 @@ class SessionMonitorMiddleware:
     """
     def __init__(self, get_response):
         self.get_response = get_response
-        self.excluded_paths = ['/api/auth/refresh', '/api/auth/validate']
+        self.excluded_paths = ['/api/auth/refresh', '/api/auth/validate', '/api/v1/accounts/google/', '/api/v1/accounts/google/callback/']
         
     def __call__(self, request):
         if request.user.is_authenticated and request.path not in self.excluded_paths:
@@ -58,6 +75,54 @@ class SessionMonitorMiddleware:
                 return JsonResponse({'error': 'Session expired'}, status=401)
             request.session['last_activity'] = time.time()
         return self.get_response(request)
+
+class AdminUserCreateView(APIView):
+    """
+    Admin-only endpoint for creating user accounts (admin, merchant, customer)
+    """
+    permission_classes = [IsAdminUser]
+    
+    def post(self, request):
+        # Only admins can create users through this endpoint
+        if not request.user.is_staff or request.user.user_type != 1:
+            return Response(
+                {'error': 'Only administrators can create user accounts'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        serializer = AccountsUserSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            # Create user through AuthService
+            user = AuthService.create_user(
+                email=serializer.validated_data['email'],
+                password=serializer.validated_data.get('password'),  # Optional for admin creation
+                user_type=serializer.validated_data.get('user_type', 3),  # Default to customer
+                username=serializer.validated_data.get('username'),
+                first_name=serializer.validated_data.get('first_name'),
+                last_name=serializer.validated_data.get('last_name'),
+                phone=serializer.validated_data.get('phone', '')
+            )
+            
+            # If no password provided, set unusable password (force reset)
+            if not serializer.validated_data.get('password'):
+                user.set_unusable_password()
+                user.save()
+            
+            # Log admin action
+            logger.info(f"Admin {request.user.email} created user account: {user.email} (type: {user.user_type})")
+            
+            response_serializer = AccountsUserSerializer(user)
+            return Response(response_serializer.data, status=status.HTTP_201_CREATED)
+            
+        except Exception as e:
+            logger.error(f"Admin user creation failed: {str(e)}")
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
 class AdminUserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
@@ -84,85 +149,162 @@ class UserRegisterView(APIView):
     User registration endpoint
     """
     permission_classes = []  # Allow unauthenticated access to registration
+    throttle_classes = []  # Disable throttling for registration
     
     def post(self, request):
         serializer = UserRegisterSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
+        if not serializer.is_valid():
+            # Log validation errors for debugging
+            logger.error(f"Registration validation failed: {serializer.errors}")
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         
         try:
+            # Auto-identify user type if not provided or if we want to override
+            email = serializer.validated_data['email']
+            provided_user_type = serializer.validated_data.get('user_type')
+            
+            # Auto-detect user type based on email patterns
+            auto_detected_type = AuthService.auto_identify_user_type(email, provided_user_type)
+            
+            # Log auto-identification if it differs from provided type
+            if provided_user_type and auto_detected_type != provided_user_type:
+                logger.info(f"Auto-identified user type {auto_detected_type} for {email}, overriding provided type {provided_user_type}")
+            elif not provided_user_type:
+                logger.info(f"Auto-identified user type {auto_detected_type} for {email}")
+            
             user = AuthService.create_user(
-                email=serializer.validated_data['email'],
+                email=email,
                 password=serializer.validated_data['password'],
-                user_type=serializer.validated_data['user_type'],
+                user_type=auto_detected_type,
                 username=serializer.validated_data.get('username'),
                 first_name=serializer.validated_data.get('first_name'),
                 last_name=serializer.validated_data.get('last_name'),
-                phone=serializer.validated_data.get('phone')
+                phone=serializer.validated_data.get('phone', '')
             )
+            
             tokens = AuthService.get_tokens_for_user(user)
-            return Response(tokens, status=status.HTTP_201_CREATED)
+            
+            # Include user type display info in response
+            user_type_info = AuthService.get_user_type_display_info(user.user_type)
+            
+            response_data = {
+                **tokens,
+                'user_type_info': user_type_info,
+                'auto_identified': provided_user_type is None or auto_detected_type != provided_user_type
+            }
+            
+            return Response(response_data, status=status.HTTP_201_CREATED)
         except Exception as e:
+            logger.error(f"Registration failed: {str(e)}")
             return Response(
                 {'error': str(e)},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
+@method_decorator(csrf_exempt, name='dispatch')
 class UserLoginView(APIView):
     """
-    User authentication endpoint
+    User authentication endpoint with caching optimization
     """
     permission_classes = []  # Allow unauthenticated access to login
+    authentication_classes = []  # Disable JWT authentication for login
+    throttle_classes = []  # Disable throttling for login
     
     def post(self, request):
-        serializer = UserLoginSerializer(data=request.data, context={'request': request})
-        serializer.is_valid(raise_exception=True)
-        
+        import traceback
         try:
+            print(f"DEBUG: Login view called with data: {request.data}")
+            
+            # Validate input data
+            if not request.data or 'email' not in request.data or 'password' not in request.data:
+                print(f"DEBUG: Missing email or password in request.data")
+                return Response(
+                    {'error': 'Email and password are required'},
+                    status=400
+                )
+            
+            print(f"DEBUG: Creating serializer with data: {request.data}")
+            serializer = UserLoginSerializer(data=request.data)
+            
+            print(f"DEBUG: Checking serializer validity...")
+            is_valid = serializer.is_valid()
+            print(f"DEBUG: Serializer is_valid: {is_valid}")
+            
+            if not is_valid:
+                print(f"DEBUG: Serializer errors: {serializer.errors}")
+                error_msg = 'Invalid email or password.'
+                
+                # Check if this might be an admin login attempt
+                email = request.data.get('email', '')
+                try:
+                    from django.contrib.auth import get_user_model
+                    User = get_user_model()
+                    user = User.objects.filter(email=email).first()
+                    if user and user.user_type == 1:  # Admin user
+                        error_msg = 'Access denied. Invalid admin credentials.'
+                except Exception as e:
+                    print(f"DEBUG: Error checking admin user: {e}")
+                
+                return Response(
+                    {'error': error_msg},
+                    status=400
+                )
+            
+            print("DEBUG: Serializer valid, getting user")
             user = serializer.validated_data['user']
-            tokens = AuthService.get_tokens_for_user(user)
             
-            # Log successful login
-            logger.info(f"User {user.email} logged in successfully")
+            print(f"DEBUG: User found: {user.email}, type: {user.user_type}")
+            print(f"DEBUG: User is_active: {user.is_active}, is_verified: {user.is_verified}")
             
-            # Set session data
-            request.session['user_id'] = str(user.id)
-            request.session['last_activity'] = str(time.time())
+            # Generate tokens
+            from rest_framework_simplejwt.tokens import RefreshToken
+            try:
+                refresh = RefreshToken.for_user(user)
+                access_token = str(refresh.access_token)
+                refresh_token = str(refresh)
+                print("DEBUG: Tokens generated successfully")
+            except Exception as e:
+                print(f"ERROR: Token generation failed: {str(e)}")
+                return Response(
+                    {'error': 'Authentication failed. Please try again.'},
+                    status=500
+                )
             
-            # Add user data to the response
-            user_data = {
-                'id': user.id,
-                'email': user.email,
-                'first_name': user.first_name,
-                'last_name': user.last_name,
-                'is_verified': user.is_verified,
-                'role': 'admin' if user.is_staff else 'user'
-            }
+            role_mapping = {1: 'admin', 2: 'merchant', 3: 'customer'}
+            
+            # Get user type display info
+            user_type_info = AuthService.get_user_type_display_info(user.user_type)
             
             response_data = {
-                'access': tokens['access'],
-                'refresh': tokens['refresh'],
-                'user': user_data
+                'access': access_token,
+                'refresh': refresh_token,
+                'user': {
+                    'id': user.id,
+                    'email': user.email,
+                    'first_name': user.first_name or '',
+                    'last_name': user.last_name or '',
+                    'role': role_mapping.get(user.user_type, 'customer'),
+                    'is_verified': user.is_verified
+                },
+                'user_type_info': user_type_info
             }
             
-            return Response(response_data, status=status.HTTP_200_OK)
+            print("DEBUG: Login successful")
+            return Response(response_data, status=200)
             
-        except serializers.ValidationError as e:
-            logger.warning(f"Login validation failed: {str(e)}")
-            return Response(
-                {'error': str(e.detail[0]) if hasattr(e, 'detail') else 'Invalid credentials'},
-                status=status.HTTP_401_UNAUTHORIZED
-            )
         except Exception as e:
-            logger.error(f"Login error: {str(e)}")
+            print(f"ERROR: Unexpected error in login: {str(e)}")
+            print(traceback.format_exc())
             return Response(
-                {'error': 'An error occurred during login. Please try again.'},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                {'error': 'An unexpected error occurred. Please try again.'},
+                status=500
             )
 
 class UserRefreshView(APIView):
     """
     Token refresh endpoint
     """
+    permission_classes = [AllowAny]
     
     def post(self, request):
         try:
@@ -409,6 +551,283 @@ class PasswordPolicyView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
+class EmailVerificationView(APIView):
+    """
+    Email verification request endpoint
+    """
+
+    def post(self, request):
+        try:
+            email = request.data.get('email')
+            if not email:
+                raise ValueError('Email is required')
+
+            # Send email verification link
+            AuthService.send_email_verification(email)
+            return Response(
+                {'message': 'Email verification link sent successfully'},
+                status=status.HTTP_200_OK
+            )
+        except Exception as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+class EmailVerificationConfirmView(APIView):
+    """
+    Email verification confirmation endpoint
+    """
+
+    def post(self, request):
+        try:
+            token = request.data.get('token')
+            if not token:
+                raise ValueError('Verification token is required')
+
+            # Verify email with token
+            AuthService.verify_email_token(token)
+            return Response(
+                {'message': 'Email verified successfully'},
+                status=status.HTTP_200_OK
+            )
+        except Exception as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+class PasswordChangeView(APIView):
+    """
+    Password change endpoint for authenticated users
+    """
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request):
+        try:
+            current_password = request.data.get('current_password')
+            new_password = request.data.get('new_password')
+            confirm_password = request.data.get('confirm_password')
+            
+            if not all([current_password, new_password, confirm_password]):
+                raise ValueError('All password fields are required')
+                
+            if new_password != confirm_password:
+                raise ValueError('New passwords do not match')
+                
+            # Verify current password
+            if not request.user.check_password(current_password):
+                raise ValueError('Current password is incorrect')
+                
+            # Change password
+            request.user.set_password(new_password)
+            request.user.save()
+            
+            return Response(
+                {'message': 'Password changed successfully'},
+                status=status.HTTP_200_OK
+            )
+        except Exception as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+class ProfileView(APIView):
+    """
+    User profile endpoint for authenticated users
+    """
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        try:
+            serializer = AccountsUserSerializer(request.user)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+    
+    def patch(self, request):
+        try:
+            serializer = AccountsUserSerializer(request.user, data=request.data, partial=True)
+            if serializer.is_valid():
+                serializer.save()
+                return Response(serializer.data, status=status.HTTP_200_OK)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+from django.http import HttpResponseRedirect
+from django.views.decorators.csrf import csrf_exempt
+from django.utils.decorators import method_decorator
+
+@csrf_exempt
+def google_oauth_view(request):
+    """
+    Simple function-based view for Google OAuth initiation to bypass DRF authentication
+    """
+    try:
+        if not hasattr(settings, 'GOOGLE_OAUTH_CLIENT_ID') or not settings.GOOGLE_OAUTH_CLIENT_ID:
+            from django.http import JsonResponse
+            return JsonResponse({
+                'error': 'Google OAuth is not configured. Please set GOOGLE_OAUTH_CLIENT_ID and GOOGLE_OAUTH_CLIENT_SECRET in your environment.'
+            }, status=503)
+
+        from .oauth import GoogleOAuth
+
+        # Get the frontend callback URL
+        frontend_url = request.GET.get('callback_url', 'http://localhost:3000')
+        redirect_uri = f"{frontend_url}/auth/callback/google"
+
+        google_oauth = GoogleOAuth()
+        oauth_session = google_oauth.get_oauth_session(redirect_uri)
+
+        authorization_url, state = oauth_session.authorization_url(
+            GoogleOAuth.AUTHORIZATION_BASE_URL,
+            access_type="offline",
+            prompt="consent"
+        )
+
+        # Store state and redirect_uri in session for security
+        request.session['oauth_state'] = state
+        request.session['oauth_redirect_uri'] = redirect_uri
+
+        return HttpResponseRedirect(authorization_url)
+
+    except Exception as e:
+        logger.error(f"Google OAuth initiation failed: {str(e)}")
+        from django.http import JsonResponse
+        return JsonResponse({'error': 'Failed to initiate Google OAuth'}, status=500)
+
+class GoogleAuthView(APIView):
+    """
+    Google OAuth initiation endpoint - redirects to Google for authorization
+    """
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    @method_decorator(csrf_exempt)
+    def dispatch(self, *args, **kwargs):
+        return super().dispatch(*args, **kwargs)
+
+    def get(self, request):
+        try:
+            # Check if Google OAuth is configured
+            if not hasattr(settings, 'GOOGLE_OAUTH_CLIENT_ID') or not settings.GOOGLE_OAUTH_CLIENT_ID:
+                return Response(
+                    {'error': 'Google OAuth is not configured. Please set GOOGLE_OAUTH_CLIENT_ID and GOOGLE_OAUTH_CLIENT_SECRET in your environment.'},
+                    status=status.HTTP_503_SERVICE_UNAVAILABLE
+                )
+
+            from .oauth import GoogleOAuth
+            from django.http import HttpResponseRedirect
+
+            # Get the frontend callback URL
+            frontend_url = request.GET.get('callback_url', 'http://localhost:3000')
+            redirect_uri = f"{frontend_url}/auth/callback/google"
+
+            google_oauth = GoogleOAuth()
+            oauth_session = google_oauth.get_oauth_session(redirect_uri)
+
+            authorization_url, state = oauth_session.authorization_url(
+                GoogleOAuth.AUTHORIZATION_BASE_URL,
+                access_type="offline",
+                prompt="consent"
+            )
+
+            # Store state and redirect_uri in session for security
+            request.session['oauth_state'] = state
+            request.session['oauth_redirect_uri'] = redirect_uri
+
+            return HttpResponseRedirect(authorization_url)
+
+        except Exception as e:
+            logger.error(f"Google OAuth initiation failed: {str(e)}")
+            return Response(
+                {'error': 'Failed to initiate Google OAuth'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+class GoogleOAuthCallbackView(APIView):
+    """
+    Google OAuth callback endpoint to exchange authorization code for tokens
+    """
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    @method_decorator(csrf_exempt)
+    def dispatch(self, *args, **kwargs):
+        return super().dispatch(*args, **kwargs)
+
+    def post(self, request):
+        try:
+            # Check if Google OAuth is configured
+            if not hasattr(settings, 'GOOGLE_OAUTH_CLIENT_ID') or not settings.GOOGLE_OAUTH_CLIENT_ID:
+                return Response(
+                    {'error': 'Google OAuth is not configured. Please set GOOGLE_OAUTH_CLIENT_ID and GOOGLE_OAUTH_CLIENT_SECRET in your environment.'},
+                    status=status.HTTP_503_SERVICE_UNAVAILABLE
+                )
+
+            code = request.data.get('code')
+            state = request.data.get('state')
+            if not code:
+                raise ValueError('Authorization code is required')
+
+            # Validate state parameter for security
+            session_state = request.session.get('oauth_state')
+            if state and session_state and state != session_state:
+                raise ValueError('Invalid OAuth state')
+
+            # Get the redirect URI from the session or use default
+            redirect_uri = request.session.get('oauth_redirect_uri', 'http://localhost:3000/auth/callback/google')
+
+            # Exchange code for tokens and get user info
+            from .oauth import GoogleOAuth, OAuthService
+            google_oauth = GoogleOAuth()
+
+            # Create OAuth session with the same redirect URI used during authorization
+            oauth_session = google_oauth.get_oauth_session(redirect_uri)
+            token_url = 'https://oauth2.googleapis.com/token'
+
+            token_response = oauth_session.fetch_token(
+                token_url=token_url,
+                code=code,
+                client_secret=settings.GOOGLE_OAUTH_CLIENT_SECRET
+            )
+
+            # Get user info
+            user_info = google_oauth.get_user_info(token_response)
+
+            # Authenticate or create user
+            user = OAuthService.authenticate_or_create(user_info, 'google')
+
+            # Generate JWT tokens
+            tokens = AuthService.generate_tokens(user)
+
+            return Response({
+                'access': str(tokens['access']),
+                'refresh': str(tokens['refresh']),
+                'user': {
+                    'id': str(user.id),
+                    'email': user.email,
+                    'first_name': user.first_name,
+                    'last_name': user.last_name,
+                    'role': dict(user.USER_TYPE_CHOICES).get(user.user_type, 'customer')
+                }
+            }, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            logger.error(f"Google OAuth callback failed: {str(e)}")
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
 class AdminActivityView(APIView):
     """
     Admin activity logging and retrieval endpoint
@@ -478,21 +897,137 @@ class BackupVerificationView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-class BackupVerificationListView(APIView):
+class CustomerBalanceView(APIView):
     """
-    Backup verification attempts listing endpoint
+    Customer balance endpoint
     """
-    permission_classes = [IsAdminUser]
-    
+    permission_classes = [IsAuthenticated]
+
     def get(self, request):
         try:
-            # Get all backup verification attempts
-            verifications = AuthService.get_backup_verifications(
-                user_id=request.query_params.get('user_id'),
-                status=request.query_params.get('status'),
-                limit=request.query_params.get('limit', 100)
+            # Get customer profile
+            customer = getattr(request.user, 'customer_profile', None)
+            if not customer:
+                return Response({'error': 'Customer profile not found'}, status=status.HTTP_404_NOT_FOUND)
+
+            # Return balance information
+            balance_data = {
+                'balance': str(customer.balance),
+                'currency': 'GHS',  # Default currency
+                'available_balance': str(customer.balance),
+                'pending_balance': '0.00'
+            }
+            return Response(balance_data, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_400_BAD_REQUEST
             )
-            return Response(verifications, status=status.HTTP_200_OK)
+
+
+class CustomerPaymentsView(APIView):
+    """
+    Customer payments/transactions endpoint
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            # Get customer profile
+            customer = getattr(request.user, 'customer_profile', None)
+            if not customer:
+                return Response({'error': 'Customer profile not found'}, status=status.HTTP_404_NOT_FOUND)
+
+            # Get customer transactions (simplified for now)
+            transactions = Transaction.objects.filter(customer=customer).order_by('-created_at')[:20]
+
+            serializer = PaymentsTransactionSerializer(transactions, many=True)
+            return Response({
+                'transactions': serializer.data,
+                'count': len(serializer.data)
+            }, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+
+class CustomerReceiptsView(APIView):
+    """
+    Customer receipts endpoint
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            # Get customer profile
+            customer = getattr(request.user, 'customer_profile', None)
+            if not customer:
+                return Response({'error': 'Customer profile not found'}, status=status.HTTP_404_NOT_FOUND)
+
+            # Get customer receipts/payments (simplified for now)
+            payments = Payment.objects.filter(customer=customer).order_by('-created_at')[:20]
+
+            serializer = PaymentSerializer(payments, many=True)
+            return Response({
+                'receipts': serializer.data,
+                'count': len(serializer.data)
+            }, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+
+class CustomerStatsView(APIView):
+    """
+    Customer statistics endpoint
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            from datetime import timedelta
+            from django.utils import timezone
+            from payments.models import Transaction as PaymentTransaction
+            from django.db.models import Q
+            
+            # Get customer profile
+            customer = getattr(request.user, 'customer_profile', None)
+            
+            # Get transactions for this month
+            thirty_days_ago = timezone.now() - timedelta(days=30)
+            
+            # Query payments Transaction model (has customer field)
+            if customer:
+                all_transactions = PaymentTransaction.objects.filter(customer=customer)
+            else:
+                # Fallback: use accounts Transaction model with sender field
+                all_transactions = Transaction.objects.filter(
+                    Q(sender=request.user) | Q(recipient=request.user)
+                )
+            
+            this_month_transactions = all_transactions.filter(created_at__gte=thirty_days_ago)
+            
+            total_transactions = all_transactions.count()
+            transactions_this_month = this_month_transactions.count()
+            completed_transactions = all_transactions.filter(status='completed').count()
+            failed_transactions = all_transactions.filter(status='failed').count()
+            
+            # Calculate success rate
+            success_rate = 0
+            if total_transactions > 0:
+                success_rate = (completed_transactions / total_transactions) * 100
+
+            return Response({
+                'transactions_this_month': transactions_this_month,
+                'success_rate': round(success_rate, 1),
+                'total_transactions': total_transactions,
+                'completed_transactions': completed_transactions,
+                'failed_transactions': failed_transactions,
+            }, status=status.HTTP_200_OK)
         except Exception as e:
             return Response(
                 {'error': str(e)},
@@ -553,45 +1088,6 @@ class SessionAnalyticsView(APIView):
                 limit=request.query_params.get('limit', 30)
             )
             return Response(analytics, status=status.HTTP_200_OK)
-        except Exception as e:
-            return Response(
-                {'error': str(e)},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-class ConcurrentSessionCheckView(APIView):
-    """
-    Concurrent session check endpoint
-    """
-    
-    def get(self, request):
-        try:
-            # Requires authenticated user
-            if not request.user.is_authenticated:
-                raise Exception('Authentication required')
-                
-            # Check for concurrent sessions
-            has_concurrent = AuthService.has_concurrent_sessions(request.user)
-            return Response(
-                {'has_concurrent_sessions': has_concurrent},
-                status=status.HTTP_200_OK
-            )
-        except Exception as e:
-            return Response(
-                {'error': str(e)},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-class SessionTestView(APIView):
-    """
-    Session testing endpoint (for development/testing)
-    """
-    
-    def get(self, request):
-        try:
-            # Test session functionality
-            test_results = AuthService.test_session_functionality(request)
-            return Response(test_results, status=status.HTTP_200_OK)
         except Exception as e:
             return Response(
                 {'error': str(e)},
@@ -661,6 +1157,23 @@ class RedeemPointsView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
+class BalanceView(APIView):
+    """
+    Get current account balance for authenticated user
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            # Get balance from user's account
+            balance = AuthService.get_account_balance(request.user)
+            return Response(balance, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
 class CheckoutAPIView(APIView):
     """
     Handle checkout operations
@@ -711,41 +1224,6 @@ class StripeWebhookView(APIView):
             
             # Process webhook event
             result = AuthService.process_stripe_webhook(event)
-            
-            return Response(result, status=status.HTTP_200_OK)
-        except Exception as e:
-            return Response(
-                {'error': str(e)},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-class PayPalWebhookView(APIView):
-    """
-    Handle PayPal webhook events
-    """
-    permission_classes = []
-    
-    def post(self, request):
-        try:
-            # Verify webhook signature
-            payload = request.body
-            auth_algo = request.META.get('HTTP_PAYPAL_AUTH_ALGO')
-            cert_url = request.META.get('HTTP_PAYPAL_CERT_URL')
-            transmission_id = request.META.get('HTTP_PAYPAL_TRANSMISSION_ID')
-            transmission_sig = request.META.get('HTTP_PAYPAL_TRANSMISSION_SIG')
-            transmission_time = request.META.get('HTTP_PAYPAL_TRANSMISSION_TIME')
-            
-            event = AuthService.verify_paypal_webhook(
-                payload,
-                auth_algo,
-                cert_url,
-                transmission_id,
-                transmission_sig,
-                transmission_time
-            )
-            
-            # Process webhook event
-            result = AuthService.process_paypal_webhook(event)
             
             return Response(result, status=status.HTTP_200_OK)
         except Exception as e:
@@ -873,19 +1351,24 @@ class AuthLogViewSet(viewsets.ReadOnlyModelViewSet):
             
         return queryset
 
-class TransactionViewSet(viewsets.ModelViewSet):
+class TransactionViewSet(viewsets.ReadOnlyModelViewSet):
     """
     API endpoint for managing financial transactions
     """
     queryset = Transaction.objects.all().order_by('-created_at')
-    serializer_class = AccountsTransactionSerializer
+    serializer_class = PaymentsTransactionSerializer
     permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
     
     def get_queryset(self):
         queryset = super().get_queryset()
-        # Filter by current user unless admin
+        # Filter by current user - if customer, show transactions where user is customer
+        # if merchant, show transactions where user is merchant
         if not self.request.user.is_staff:
-            queryset = queryset.filter(user=self.request.user)
+            if self.request.user.user_type == 3:  # customer
+                queryset = queryset.filter(customer__user=self.request.user)
+            elif self.request.user.user_type == 2:  # merchant
+                queryset = queryset.filter(merchant__user=self.request.user)
             
         # Add additional filters
         status = self.request.query_params.get('status')
@@ -909,37 +1392,40 @@ class TransactionViewSet(viewsets.ModelViewSet):
         transaction = serializer.save(user=self.request.user)
         AuthService.process_transaction(transaction)
 
-class ProductViewSet(viewsets.ModelViewSet):
+class PaymentsViewSet(viewsets.ReadOnlyModelViewSet):
     """
-    API endpoint for managing products
+    API endpoint for managing financial payments
     """
-    queryset = Product.objects.all()
-    serializer_class = ProductSerializer
+    queryset = Payment.objects.all().order_by('-created_at')
+    serializer_class = PaymentSerializer
     permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
     
     def get_queryset(self):
         queryset = super().get_queryset()
-        # Filter by current merchant unless admin
+        # Filter by current user - payments where user is customer
         if not self.request.user.is_staff:
-            queryset = queryset.filter(merchant=self.request.user)
-            
+            if self.request.user.user_type == 3:  # customer
+                queryset = queryset.filter(customer__user=self.request.user)
+            elif self.request.user.user_type == 2:  # merchant
+                queryset = queryset.filter(merchant__user=self.request.user)
+                
         # Add additional filters
         status = self.request.query_params.get('status')
-        product_type = self.request.query_params.get('type')
+        currency = self.request.query_params.get('currency')
+        date_from = self.request.query_params.get('date_from')
+        date_to = self.request.query_params.get('date_to')
         
         if status:
             queryset = queryset.filter(status=status)
-        if product_type:
-            queryset = queryset.filter(product_type=product_type)
+        if currency:
+            queryset = queryset.filter(currency=currency)
+        if date_from:
+            queryset = queryset.filter(created_at__gte=date_from)
+        if date_to:
+            queryset = queryset.filter(created_at__lte=date_to)
             
         return queryset
-    
-    def perform_create(self, serializer):
-        # Set merchant to current user
-        if not self.request.user.is_staff:
-            serializer.save(merchant=self.request.user)
-        else:
-            serializer.save()
 
 class MerchantProductViewSet(viewsets.ModelViewSet):
     """
@@ -1007,7 +1493,7 @@ class SubscriptionPaymentView(APIView):
     
     VALID_PAYMENT_METHODS = [
         'credit_card', 'bank_transfer', 'mobile_money',
-        'crypto', 'wallet', 'paypal', 'gift_card'
+        'crypto', 'wallet', 'gift_card'
     ]
     
     def post(self, request):
@@ -1254,3 +1740,297 @@ class TokenValidateView(APIView):
                 {'valid': False, 'error': str(e)},
                 status=status.HTTP_401_UNAUTHORIZED
             )
+
+
+class CustomerViewSet(viewsets.ModelViewSet):
+    """
+    Customer-specific API endpoints
+    """
+    queryset = User.objects.all()  # Required for router registration
+    permission_classes = [IsAuthenticated]
+
+    @action(detail=False, methods=['get'])
+    def payments(self, request):
+        """Get customer recent payments"""
+        try:
+            # Check if user has customer profile
+            try:
+                customer_profile = request.user.customer_profile
+            except:
+                # Return empty array instead of 404 to allow dashboard to render
+                return Response([])
+
+            # Get user's transactions
+            transactions = Payment.objects.filter(
+                customer=customer_profile
+            ).select_related('merchant', 'payment_method').order_by('-created_at')[:10]  # Limit to recent payments
+
+            data = []
+            for transaction in transactions:
+                # Determine merchant name based on transaction type
+                transaction_type = transaction.metadata.get('transaction_type', 'payment') if transaction.metadata else 'payment'
+                
+                if transaction_type == 'p2p_send':
+                    merchant_name = f"To: {transaction.metadata.get('recipient_email', 'Unknown')}"
+                    payment_method_name = 'P2P Transfer'
+                elif transaction_type == 'p2p_receive':
+                    merchant_name = f"From: {transaction.metadata.get('sender_email', 'Unknown')}"
+                    payment_method_name = 'P2P Transfer'
+                elif transaction_type == 'bill_payment':
+                    bill_type = transaction.metadata.get('bill_type', 'Bill') if transaction.metadata else 'Bill'
+                    merchant_name = transaction.merchant.business_name if transaction.merchant else bill_type.title()
+                    payment_method_name = 'Wallet Balance'
+                elif transaction_type == 'airtime_purchase':
+                    recipient_phone = transaction.metadata.get('recipient_phone', 'Unknown') if transaction.metadata else 'Unknown'
+                    provider = transaction.metadata.get('provider', 'Unknown') if transaction.metadata else 'Unknown'
+                    merchant_name = f"Airtime: {recipient_phone} ({provider})"
+                    payment_method_name = 'Wallet Balance'
+                elif transaction_type == 'wallet_topup':
+                    merchant_name = 'Wallet'
+                    payment_method_name = transaction.metadata.get('payment_method', 'Top-up') if transaction.metadata else 'Top-up'
+                elif transaction_type == 'wallet_deduction':
+                    merchant_name = transaction.metadata.get('description', 'Wallet').split(':')[0] if transaction.metadata and 'description' in transaction.metadata else 'Wallet'
+                    payment_method_name = 'Wallet Deduction'
+                else:
+                    merchant_name = transaction.merchant.business_name if transaction.merchant else 'Unknown'
+                    payment_method_name = transaction.payment_method.name if transaction.payment_method else 'Unknown'
+                
+                # Use transaction description if available, otherwise create one
+                description = transaction.description or f"Payment to {merchant_name}"
+                
+                data.append({
+                    'id': str(transaction.id),
+                    'amount': float(transaction.amount),
+                    'currency': transaction.currency,
+                    'status': transaction.status,
+                    'merchant': merchant_name,
+                    'description': description,
+                    'created_at': transaction.created_at.isoformat(),
+                    'payment_method': payment_method_name,
+                    'transaction_type': transaction_type
+                })
+
+            return Response(data)
+        except Exception as e:
+            logger.error(f"Error fetching customer payments: {str(e)}")
+            return Response({'error': 'Failed to fetch payments'}, status=500)
+
+    @action(detail=False, methods=['get'])
+    def receipts(self, request):
+        """Get customer receipts"""
+        try:
+            # Check if user has customer profile
+            try:
+                customer_profile = request.user.customer_profile
+            except:
+                # Return empty array instead of 404 to allow dashboard to render
+                return Response([])
+
+            # Get user's successful transactions as receipts
+            transactions = Payment.objects.filter(
+                customer=customer_profile,
+                status='completed'
+            ).select_related('merchant', 'payment_method').order_by('-created_at')[:5]  # Limit to recent receipts
+
+            data = []
+            for transaction in transactions:
+                # Determine merchant name based on transaction type
+                transaction_type = transaction.metadata.get('transaction_type', 'payment') if transaction.metadata else 'payment'
+                
+                if transaction_type == 'p2p_send':
+                    merchant_name = f"To: {transaction.metadata.get('recipient_email', 'Unknown')}"
+                elif transaction_type == 'p2p_receive':
+                    merchant_name = f"From: {transaction.metadata.get('sender_email', 'Unknown')}"
+                elif transaction_type == 'bill_payment':
+                    bill_type = transaction.metadata.get('bill_type', 'Bill') if transaction.metadata else 'Bill'
+                    merchant_name = transaction.merchant.business_name if transaction.merchant else bill_type.title()
+                elif transaction_type == 'airtime_purchase':
+                    recipient_phone = transaction.metadata.get('recipient_phone', 'Unknown') if transaction.metadata else 'Unknown'
+                    provider = transaction.metadata.get('provider', 'Unknown') if transaction.metadata else 'Unknown'
+                    merchant_name = f"Airtime: {recipient_phone} ({provider})"
+                elif transaction_type == 'wallet_topup':
+                    merchant_name = 'Wallet'
+                elif transaction_type == 'wallet_deduction':
+                    merchant_name = transaction.metadata.get('description', 'Wallet').split(':')[0] if transaction.metadata and 'description' in transaction.metadata else 'Wallet'
+                else:
+                    merchant_name = transaction.merchant.business_name if transaction.merchant else 'Unknown'
+                
+                data.append({
+                    'id': str(transaction.id),
+                    'payment_id': str(transaction.id),
+                    'amount': float(transaction.amount),
+                    'currency': transaction.currency,
+                    'merchant': merchant_name,
+                    'date': transaction.created_at.date().isoformat(),
+                    'receipt_number': f"RCP-{transaction.id}",
+                    'download_url': f"/api/receipts/{transaction.id}/download/",
+                    'transaction_type': transaction_type
+                })
+
+            return Response(data)
+        except Exception as e:
+            logger.error(f"Error fetching customer receipts: {str(e)}")
+            return Response({'error': 'Failed to fetch receipts'}, status=500)
+
+    @action(detail=False, methods=['get'])
+    def balance(self, request):
+        """Get customer account balance"""
+        try:
+            # For now, return a mock balance. In a real implementation,
+            # this would calculate from actual transactions
+            balance_data = {
+                'available': 0.00,  # Default for new customers
+                'pending': 0.00,
+                'currency': 'GHS',
+                'last_updated': timezone.now().isoformat()
+            }
+            return Response(balance_data)
+        except Exception as e:
+            logger.error(f"Error fetching customer balance: {str(e)}")
+            return Response({'error': 'Failed to fetch balance'}, status=500)
+
+    @action(detail=False, methods=['get', 'patch'])
+    def profile(self, request):
+        """Get or update customer profile"""
+        try:
+            user = request.user
+            customer_profile = getattr(user, 'customer_profile', None)
+            
+            if request.method == 'GET':
+                profile_data = {
+                    'id': user.id,
+                    'email': user.email,
+                    'first_name': user.first_name,
+                    'last_name': user.last_name,
+                    'phone': user.phone,
+                    'date_joined': user.date_joined.isoformat(),
+                    'role': dict(user.USER_TYPE_CHOICES).get(user.user_type, 'customer'),
+                    'is_verified': user.is_verified,
+                    'customer_profile': {
+                        'date_of_birth': customer_profile.date_of_birth.isoformat() if customer_profile and customer_profile.date_of_birth else None,
+                        'kyc_verified': customer_profile.kyc_verified if customer_profile else False,
+                        'address': customer_profile.address if customer_profile else {}
+                    } if customer_profile else None
+                }
+                return Response(profile_data)
+            elif request.method == 'PATCH':
+                # Update user profile
+                allowed_fields = ['first_name', 'last_name', 'phone']
+                for field in allowed_fields:
+                    if field in request.data:
+                        setattr(user, field, request.data[field])
+                user.save()
+
+                # Update customer profile if it exists
+                if customer_profile and 'customer_profile' in request.data:
+                    customer_data = request.data['customer_profile']
+                    if 'date_of_birth' in customer_data:
+                        customer_profile.date_of_birth = customer_data['date_of_birth']
+                    if 'address' in customer_data:
+                        customer_profile.address = customer_data['address']
+                    customer_profile.save()
+
+                profile_data = {
+                    'id': user.id,
+                    'email': user.email,
+                    'first_name': user.first_name,
+                    'last_name': user.last_name,
+                    'phone': user.phone,
+                    'date_joined': user.date_joined.isoformat(),
+                    'role': dict(user.USER_TYPE_CHOICES).get(user.user_type, 'customer'),
+                    'is_verified': user.is_verified,
+                    'customer_profile': {
+                        'date_of_birth': customer_profile.date_of_birth.isoformat() if customer_profile and customer_profile.date_of_birth else None,
+                        'kyc_verified': customer_profile.kyc_verified if customer_profile else False,
+                        'address': customer_profile.address if customer_profile else {}
+                    } if customer_profile else None
+                }
+                return Response(profile_data)
+        except Exception as e:
+            logger.error(f"Error with customer profile: {str(e)}")
+            return Response({'error': 'Failed to process profile request'}, status=500)
+
+class SupportTicketViewSet(viewsets.ModelViewSet):
+    serializer_class = SupportTicketSerializer
+    permission_classes = [IsAuthenticated]
+    
+    def get_queryset(self):
+        return SupportTicket.objects.filter(user=self.request.user)
+    
+    def get_serializer_class(self):
+        if self.action == 'create':
+            return CreateSupportTicketSerializer
+        return SupportTicketSerializer
+    
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+    
+    @action(detail=True, methods=['post'])
+    def add_message(self, request, pk=None):
+        ticket = self.get_object()
+        serializer = CreateSupportMessageSerializer(data=request.data, context={'ticket': ticket})
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class PayoutViewSet(viewsets.ModelViewSet):
+    serializer_class = PayoutSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return Payout.objects.filter(merchant=self.request.user)
+
+    def perform_create(self, serializer):
+        serializer.save(merchant=self.request.user)
+
+    @action(detail=False, methods=['get'])
+    def balance(self, request):
+        """Get merchant payout balance"""
+        # For now, return a mock balance
+        # In real implementation, calculate from transactions
+        balance = {
+            'available': 1500.00,
+            'pending': 250.00,
+            'currency': 'GHS'
+        }
+        return Response(balance)
+
+class UserSearchView(APIView):
+    """
+    API endpoint for searching SikaRemit users by email or phone
+    Used for p2p transfers to find recipients
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        query = request.GET.get('q', '').strip()
+        
+        if not query or len(query) < 2:
+            return Response(
+                {'error': 'Search query must be at least 2 characters long'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Search users by email or phone (excluding current user)
+        users = User.objects.filter(
+            Q(email__icontains=query) | Q(phone__icontains=query)
+        ).exclude(id=request.user.id).select_related()[:10]  # Limit to 10 results
+        
+        # Format response
+        results = []
+        for user in users:
+            results.append({
+                'id': user.id,
+                'email': user.email,
+                'phone': user.phone,
+                'first_name': user.first_name,
+                'last_name': user.last_name,
+                'full_name': f"{user.first_name} {user.last_name}".strip(),
+                'is_verified': user.is_verified,
+            })
+        
+        return Response({
+            'results': results,
+            'count': len(results)
+        })

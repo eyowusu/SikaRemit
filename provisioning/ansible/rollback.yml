@@ -1,12 +1,12 @@
 ---
-- name: Rollback PayGlobe Configuration
+- name: Rollback SikaRemit Configuration
   hosts: all
   vars:
     backup_version: "20251031_120000"
   tasks:
     - name: Validate backup exists
       uri:
-        url: "https://backups.payglobe.com/payglobe_config_{{ backup_version }}.zip"
+        url: "https://backups.sikaremit.com/sikaremit_config_{{ backup_version }}.zip"
         method: HEAD
       register: backup_check
       failed_when: backup_check.status != 200
@@ -14,11 +14,11 @@
     - name: Create restore point
       command: ./scripts/backup_config.sh
       args:
-        chdir: /opt/payglobe
+        chdir: /opt/sikaremit
 
     - name: Download backup
       unarchive:
-        src: "https://backups.payglobe.com/payglobe_config_{{ backup_version }}.zip"
+        src: "https://backups.sikaremit.com/sikaremit_config_{{ backup_version }}.zip"
         dest: "/tmp/rollback"
         remote_src: yes
 
@@ -40,5 +40,5 @@
 
     - name: Restart services
       systemd:
-        name: payglobe
+        name: sikaremit
         state: restarted

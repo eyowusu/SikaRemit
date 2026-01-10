@@ -15,21 +15,24 @@ class PaymentMethod(models.Model):
     TELECEL = 'telecel'
     AIRTEL_TIGO = 'airtel_tigo'
     QR = 'qr'
+    MOBILE_MONEY = 'mobile_money'
     
     METHOD_CHOICES = [
-        (CARD, 'Credit/Debit Card'),
+        (CARD, 'Credit/Debit Card (Stripe/Paystack)'),
         (BANK, 'Bank Transfer'),
         (CRYPTO, 'Cryptocurrency'),
         (MTN_MOMO, 'MTN Mobile Money'),
         (TELECEL, 'Telecel Cash'),
         (AIRTEL_TIGO, 'AirtelTigo Money'),
-        (QR, 'QR Payment')
+        (QR, 'QR Payment'),
+        (MOBILE_MONEY, 'Mobile Money')
     ]
     
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     method_type = models.CharField(
         max_length=20,  # Increased with ample buffer
-        choices=METHOD_CHOICES
+        choices=METHOD_CHOICES,
+        db_index=True  # Index for filtering by payment method type
     )
     details = models.JSONField()
     is_default = models.BooleanField(default=False)

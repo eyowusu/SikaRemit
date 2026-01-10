@@ -18,7 +18,6 @@ class PaymentLog(models.Model):
     # Payment provider references
     stripe_charge_id = models.CharField(max_length=100, blank=True, null=True)
     stripe_payment_intent_id = models.CharField(max_length=100, blank=True, null=True)
-    paypal_order_id = models.CharField(max_length=100, blank=True, null=True)
     
     # Remittance specific fields
     recipient_name = models.CharField(max_length=255, blank=True, null=True)
