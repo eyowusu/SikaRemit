@@ -384,35 +384,28 @@ class StripeGatewayTests(TestCase):
         
         self.assertTrue(result['success'])
         self.assertEqual(result['transaction_id'], 're_test_123')
-
-
-class FlutterwaveGatewayTests(TestCase):
-    """Tests for Flutterwave gateway"""
     
     @override_settings(
-        FLUTTERWAVE_SECRET_KEY='FLWSECK_TEST-123',
-        FLUTTERWAVE_PUBLIC_KEY='FLWPUBK_TEST-123',
+        STRIPE_SECRET_KEY='sk_test_123',
+        STRIPE_PUBLISHABLE_KEY='pk_test_123',
         FRONTEND_URL='http://localhost:3000'
     )
     @patch('requests.get')
     @patch('requests.post')
     def test_process_payment_success(self, mock_post, mock_get):
-        """Test successful Flutterwave payment"""
-        from payments.gateways.flutterwave import FlutterwaveGateway
-        
-        # Mock balance check (initialization)
-        mock_get.return_value = MockResponse({'status': 'success'})
+        """Test successful Stripe payment"""
+        from payments.gateways.stripe import StripeGateway
         
         # Mock payment response
         mock_post.return_value = MockResponse({
             'status': 'success',
             'data': {
-                'id': 'flw_123456',
-                'link': 'https://checkout.flutterwave.com/v3/hosted/pay/123'
+                'id': 'pi_123456',
+                'client_secret': 'pi_123456_secret'
             }
         })
         
-        gateway = FlutterwaveGateway()
+        gateway = StripeGateway()
         
         class MockPaymentMethod:
             method_type = 'card'
@@ -442,32 +435,29 @@ class FlutterwaveGatewayTests(TestCase):
         self.assertIn('authorization_url', result)
     
     @override_settings(
-        FLUTTERWAVE_SECRET_KEY='FLWSECK_TEST-123',
-        FLUTTERWAVE_PUBLIC_KEY='FLWPUBK_TEST-123'
+        STRIPE_SECRET_KEY='sk_test_123',
+        STRIPE_PUBLISHABLE_KEY='pk_test_123'
     )
     @patch('requests.get')
     def test_verify_payment(self, mock_get):
-        """Test Flutterwave payment verification"""
-        from payments.gateways.flutterwave import FlutterwaveGateway
+        """Test Stripe payment verification"""
+        from payments.gateways.stripe import StripeGateway
         
-        # Mock balance check
-        mock_get.side_effect = [
-            MockResponse({'status': 'success'}),  # Init
-            MockResponse({
-                'status': 'success',
-                'data': {
-                    'status': 'successful',
-                    'amount': 100,
-                    'currency': 'GHS'
-                }
-            })  # Verify
-        ]
+        # Mock verification response
+        mock_get.return_value = MockResponse({
+            'status': 'success',
+            'data': {
+                'status': 'succeeded',
+                'amount': 10000,
+                'currency': 'usd'
+            }
+        })
         
-        gateway = FlutterwaveGateway()
-        result = gateway.verify_payment('flw_123456')
+        gateway = StripeGateway()
+        result = gateway.verify_payment('pi_123456')
         
         self.assertTrue(result['verified'])
-        self.assertEqual(result['status'], 'successful')
+        self.assertEqual(result['status'], 'succeeded')
 
 
 class WebhookSignatureTests(TestCase):

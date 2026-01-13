@@ -41,8 +41,6 @@ class PaymentProcessor(BasePaymentProcessor):
         try:
             # Import gateway classes
             from payments.gateways.stripe import StripeGateway
-            from payments.gateways.paystack import PaystackGateway
-            from payments.gateways.flutterwave import FlutterwaveGateway
             from payments.gateways.mobile_money import (
                 MTNMoMoGateway, TelecelCashGateway, AirtelTigoMoneyGateway
             )
@@ -51,8 +49,6 @@ class PaymentProcessor(BasePaymentProcessor):
             # Gateway mapping - Core gateways for Ghana market
             gateway_classes = {
                 'stripe': StripeGateway,
-                'paystack': PaystackGateway,
-                'flutterwave': FlutterwaveGateway,
                 'mtn_momo': MTNMoMoGateway,
                 'telecel': TelecelCashGateway,
                 'airtel_tigo': AirtelTigoMoneyGateway,
@@ -184,18 +180,12 @@ class PaymentService:
         try:
             # Import gateway classes
             from payments.gateways.stripe import StripeGateway
-            from payments.gateways.paystack import PaystackGateway
-            from payments.gateways.flutterwave import FlutterwaveGateway
 
             # Register active gateways
             for gateway_name, gateway_config in gateway_registry._active_gateways.items():
                 try:
                     if gateway_name == 'stripe' and hasattr(settings, 'STRIPE_SECRET_KEY'):
                         self.gateways[gateway_name] = StripeGateway()
-                    elif gateway_name == 'paystack' and hasattr(settings, 'PAYSTACK_SECRET_KEY'):
-                        self.gateways[gateway_name] = PaystackGateway()
-                    elif gateway_name == 'flutterwave' and hasattr(settings, 'FLUTTERWAVE_SECRET_KEY'):
-                        self.gateways[gateway_name] = FlutterwaveGateway()
                     # Add other gateways as needed
 
                     if gateway_name in self.gateways:

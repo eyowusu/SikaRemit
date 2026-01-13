@@ -5,9 +5,16 @@ const withBundleAnalyzer = require('@next/bundle-analyzer')({
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   // Production optimizations
-  output: 'standalone',
+  output: 'export',
   poweredByHeader: false,
   compress: true,
+  trailingSlash: true,
+  
+  // Exclude specific routes from static generation
+  experimental: {
+    optimizeCss: true,
+    missingSuspenseCSSToken: true,
+  },
   
   // Remove rewrites for production - use direct API calls
   async rewrites() {

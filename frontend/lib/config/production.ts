@@ -24,17 +24,9 @@ export const FEATURES = {
 
 // Payment Provider Configuration
 export const PAYMENT_CONFIG = {
-  PAYSTACK: {
-    PUBLIC_KEY: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || '',
-    ENABLED: !!process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY,
-  },
   STRIPE: {
     PUBLIC_KEY: process.env.NEXT_PUBLIC_STRIPE_PUBLIC_KEY || '',
     ENABLED: !!process.env.NEXT_PUBLIC_STRIPE_PUBLIC_KEY,
-  },
-  FLUTTERWAVE: {
-    PUBLIC_KEY: process.env.NEXT_PUBLIC_FLUTTERWAVE_PUBLIC_KEY || '',
-    ENABLED: !!process.env.NEXT_PUBLIC_FLUTTERWAVE_PUBLIC_KEY,
   },
 };
 
@@ -99,10 +91,7 @@ export function validateProductionConfig(): { valid: boolean; errors: string[] }
     }
 
     // Check at least one payment provider is configured
-    const hasPaymentProvider = 
-      PAYMENT_CONFIG.PAYSTACK.ENABLED ||
-      PAYMENT_CONFIG.STRIPE.ENABLED ||
-      PAYMENT_CONFIG.FLUTTERWAVE.ENABLED;
+    const hasPaymentProvider = PAYMENT_CONFIG.STRIPE.ENABLED;
 
     if (!hasPaymentProvider) {
       errors.push('At least one payment provider must be configured');
@@ -123,9 +112,7 @@ export function logConfigStatus(): void {
     console.log('=== SikaRemit Configuration ===');
     console.log(`Environment: ${process.env.NODE_ENV}`);
     console.log(`API URL: ${API_CONFIG.BASE_URL}`);
-    console.log(`Paystack: ${PAYMENT_CONFIG.PAYSTACK.ENABLED ? 'Enabled' : 'Disabled'}`);
     console.log(`Stripe: ${PAYMENT_CONFIG.STRIPE.ENABLED ? 'Enabled' : 'Disabled'}`);
-    console.log(`Flutterwave: ${PAYMENT_CONFIG.FLUTTERWAVE.ENABLED ? 'Enabled' : 'Disabled'}`);
     console.log(`Analytics: ${FEATURES.ANALYTICS_ENABLED ? 'Enabled' : 'Disabled'}`);
     console.log(`Sentry: ${FEATURES.SENTRY_ENABLED ? 'Enabled' : 'Disabled'}`);
     console.log('===============================');

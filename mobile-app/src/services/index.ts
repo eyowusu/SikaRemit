@@ -15,9 +15,7 @@ export * as authService from './authService';
 export * as paymentService from './paymentService';
 
 // Payment Gateways
-export { default as paystackService } from './paystackService';
 export { default as stripeService } from './stripeService';
-export { default as flutterwaveService } from './flutterwaveService';
 export { default as paymentGateway, setActiveProvider, getActiveProvider } from './paymentGateway';
 export type { PaymentProvider, MobileMoneyProvider, PaymentInitResponse, PaymentVerifyResponse, SavedCard } from './paymentGateway';
 

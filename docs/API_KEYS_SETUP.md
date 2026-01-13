@@ -6,36 +6,7 @@ Complete this checklist to get all production API keys configured.
 
 ## 1. Payment Providers
 
-### Paystack (Primary - Ghana)
-**Dashboard**: https://dashboard.paystack.com
-
-1. Create account at https://paystack.com
-2. Complete business verification (requires Ghana business registration)
-3. Go to Settings → API Keys & Webhooks
-4. Copy **Live Secret Key** (`sk_live_xxxxx`)
-5. Copy **Live Public Key** (`pk_live_xxxxx`)
-6. Set webhook URL: `https://api.yourdomain.com/api/v1/payments/webhooks/paystack/`
-7. Copy **Webhook Secret**
-
-```ini
-# Backend .env
-PAYSTACK_SECRET_KEY=sk_live_xxxxx
-PAYSTACK_PUBLIC_KEY=pk_live_xxxxx
-PAYSTACK_WEBHOOK_SECRET=whsec_xxxxx
-
-# Frontend .env.local
-NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY=pk_live_xxxxx
-```
-
-**Required Documents**:
-- [ ] Business registration certificate
-- [ ] Tax identification number (TIN)
-- [ ] Bank account details
-- [ ] Director ID verification
-
----
-
-### Stripe (International Cards)
+### Stripe (Primary - International Cards)
 **Dashboard**: https://dashboard.stripe.com
 
 1. Create account at https://stripe.com
@@ -53,28 +24,6 @@ STRIPE_WEBHOOK_SECRET=whsec_xxxxx
 
 # Frontend .env.local
 NEXT_PUBLIC_STRIPE_PUBLIC_KEY=pk_live_xxxxx
-```
-
----
-
-### Flutterwave (Pan-African)
-**Dashboard**: https://dashboard.flutterwave.com
-
-1. Create account at https://flutterwave.com
-2. Complete KYB verification
-3. Go to Settings → API Keys
-4. Copy **Secret Key** and **Public Key**
-5. Set webhook URL in Settings → Webhooks
-
-```ini
-# Backend .env
-FLUTTERWAVE_SECRET_KEY=FLWSECK_xxxxx
-FLUTTERWAVE_PUBLIC_KEY=FLWPUBK_xxxxx
-FLUTTERWAVE_ENCRYPTION_KEY=xxxxx
-FLUTTERWAVE_WEBHOOK_SECRET=xxxxx
-
-# Frontend .env.local
-NEXT_PUBLIC_FLUTTERWAVE_PUBLIC_KEY=FLWPUBK_xxxxx
 ```
 
 ---

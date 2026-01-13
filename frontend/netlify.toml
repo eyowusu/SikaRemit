@@ -1,5 +1,5 @@
 [build]
-  publish = ".next"
+  publish = "out"
   command = "npm run build"
   base = "frontend/"
 
@@ -11,7 +11,7 @@
 
 [[redirects]]
   from = "/api/*"
-  to = "https://api.sikaremit.com/api/:splat"
+  to = "https://sikaremit-api.onrender.com/api/:splat"
   status = 200
   force = true
 

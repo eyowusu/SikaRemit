@@ -14,7 +14,7 @@ class Command(BaseCommand):
         parser.add_argument(
             '--provider',
             type=str,
-            choices=['stripe', 'paystack', 'flutterwave', 'all'],
+            choices=['stripe', 'all'],
             default='all',
             help='Specify which provider secrets to rotate'
         )
@@ -36,10 +36,6 @@ class Command(BaseCommand):
 
         if provider in ['stripe', 'all']:
             secrets_to_rotate.append(('STRIPE_WEBHOOK_SECRET', 'Stripe'))
-        if provider in ['paystack', 'all']:
-            secrets_to_rotate.append(('PAYSTACK_WEBHOOK_SECRET', 'Paystack'))
-        if provider in ['flutterwave', 'all']:
-            secrets_to_rotate.append(('FLUTTERWAVE_WEBHOOK_SECRET', 'Flutterwave'))
 
         rotated_secrets = {}
 

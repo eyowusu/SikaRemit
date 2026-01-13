@@ -41,8 +41,6 @@ setuptools<81
 
 # Production Payment Providers
 stripe==7.9.0
-paystack-sdk
-rave-python
 
 
 # Additional Production Dependencies

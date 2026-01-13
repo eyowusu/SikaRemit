@@ -1,8 +1,6 @@
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 
-export const dynamic = 'force-dynamic'
-
 export default function NotFound() {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-sikaremit-card px-4">

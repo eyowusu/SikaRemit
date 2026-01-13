@@ -1,13 +1,13 @@
-# SikaRemit Deployment Guide - Vercel + Render
+# SikaRemit Deployment Guide - Netlify + Render
 
 ## Overview
-This guide covers deploying SikaRemit to production using **Render** (backend) and **Vercel** (frontend).
+This guide covers deploying SikaRemit to production using **Render** (backend) and **Netlify** (frontend).
 
 ## Prerequisites
 - GitHub repository with your SikaRemit code
 - Domain name: sikaremit.com (registered with Namecheap)
 - Render account (free tier available)
-- Vercel account (free tier available)
+- Netlify account (free tier available)
 
 ## 1. Backend Deployment (Render)
 
@@ -89,42 +89,40 @@ BASE_COUNTRY=GHA
 DEFAULT_CURRENCY=GHS
 ```
 
-## 2. Frontend Deployment (Vercel)
+## 2. Frontend Deployment (Netlify)
 
-### Step 1: Create Vercel Account
-1. Go to https://vercel.com and sign up (use GitHub for easiest setup)
+### Step 1: Create Netlify Account
+1. Go to https://netlify.com and sign up (use GitHub for easiest setup)
 2. Connect your GitHub repository
 
-### Step 2: Deploy to Vercel
-1. Click "New Project"
-2. Import your GitHub repo: `your-username/SikaRemit`
-3. Configure project:
-   - **Framework Preset**: Next.js
-   - **Root Directory**: `frontend`
-   - **Build Command**: `npm run build`
-   - **Output Directory**: `.next` (automatic)
+### Step 2: Deploy to Netlify
+1. Click "New site from Git"
+2. Select GitHub and choose your repository: `your-username/SikaRemit`
+3. Configure build settings:
+   - **Build command**: `npm run build`
+   - **Publish directory**: `frontend/out`
+   - **Base directory**: `frontend`
 
 ### Step 3: Environment Variables
-In your Vercel project settings, add these environment variables:
+In your Netlify site settings, add these environment variables:
 
-```
+```bash
 NEXT_PUBLIC_API_URL=https://your-render-backend.onrender.com
+NEXT_PUBLIC_STRIPE_PUBLIC_KEY=pk_live_xxxxx
 NEXT_PUBLIC_APP_URL=https://sikaremit.com
-NEXT_TELEMETRY_DISABLED=1
-NODE_ENV=production
 ```
 
 ### Step 4: Deploy
-1. Click "Deploy"
-2. Vercel will automatically build and deploy your frontend
-3. You'll get a preview URL like: `https://sikaremit-[random].vercel.app`
+1. Click "Deploy site"
+2. Netlify will automatically build and deploy your frontend
+3. You'll get a preview URL like: `https://sikaremit-[random].netlify.app`
 
 ## 3. Domain Configuration
 
-### Step 1: Add Custom Domain to Vercel
-1. In your Vercel project dashboard, go to "Settings" → "Domains"
+### Step 1: Add Custom Domain to Netlify
+1. In your Netlify site dashboard, go to "Settings" → "Domains"
 2. Add `sikaremit.com` as a custom domain
-3. Vercel will provide DNS records to add
+3. Netlify will provide DNS records to add
 
 ### Step 2: Add Custom Domain to Render
 1. In Render web service, go to "Settings" → "Custom Domains"
@@ -136,15 +134,15 @@ NODE_ENV=production
 Go to your Namecheap dashboard and add these DNS records:
 
 ```
-# Frontend (Vercel)
+# Frontend (Netlify)
 Type: CNAME
 Host: @
-Value: cname.vercel-dns.com
+Value: your-netlify-site.netlify.app
 TTL: 30 min
 
 Type: CNAME
 Host: www
-Value: cname.vercel-dns.com
+Value: your-netlify-site.netlify.app
 TTL: 30 min
 
 # Backend API (Render)
@@ -153,15 +151,15 @@ Host: api
 Value: your-render-service.onrender.com
 TTL: 30 min
 
-# Vercel TXT record (for domain verification)
+# Netlify TXT record (for domain verification)
 Type: TXT
-Host: _vercel
-Value: vc-domain-verify=sikaremit.com,vercel-provided-token
+Host: _netlify-verification
+Value: netlify-provided-verification-token
 TTL: 30 min
 ```
 
 ### Step 4: SSL Certificates
-- Vercel automatically provisions free SSL certificates
+- Netlify automatically provisions free SSL certificates
 - Render provides free SSL certificates for custom domains
 
 ## 4. Post-Deployment Configuration
@@ -175,7 +173,7 @@ ALLOWED_HOSTS=api.sikaremit.com,your-render-url.onrender.com,localhost
 PAYMENT_CALLBACK_URL=https://api.sikaremit.com/api/v1/payments/webhooks
 ```
 
-**Frontend (Vercel):**
+**Frontend (Netlify):**
 ```
 NEXT_PUBLIC_API_URL=https://api.sikaremit.com
 NEXT_PUBLIC_APP_URL=https://sikaremit.com
@@ -203,11 +201,6 @@ Visit https://api.sikaremit.com/api/v1/health/ to verify API is running.
 2. Get production API credentials
 3. Update environment variables in Render
 
-### Paystack:
-1. Register at https://dashboard.paystack.com
-2. Get live API keys
-3. Update environment variables
-
 ### Stripe:
 1. Register at https://dashboard.stripe.com
 2. Get live API keys
@@ -215,9 +208,9 @@ Visit https://api.sikaremit.com/api/v1/health/ to verify API is running.
 
 ## 7. Monitoring and Maintenance
 
-### Vercel Features:
+### Netlify Features:
 - **Analytics**: Real-time performance metrics
-- **Functions Logs**: Serverless function monitoring
+- **Build Logs**: Detailed build and deploy logs
 - **Error Tracking**: Automatic error reporting
 - **Preview Deployments**: Every PR gets a preview URL
 
@@ -228,16 +221,16 @@ Visit https://api.sikaremit.com/api/v1/health/ to verify API is running.
 
 ### Updates:
 - Push code changes to GitHub
-- Vercel and Render will auto-deploy
+- Netlify and Render will auto-deploy
 - Preview deployments for testing before production
 
 ## 8. Troubleshooting
 
 ### Common Issues:
 
-**Vercel Build Fails:**
-- Check build logs in Vercel dashboard
-- Verify `vercel.json` configuration
+**Netlify Build Fails:**
+- Check build logs in Netlify dashboard
+- Verify build settings in Netlify
 - Ensure all dependencies are in `package.json`
 
 **Render Build Fails:**
@@ -251,25 +244,25 @@ Visit https://api.sikaremit.com/api/v1/health/ to verify API is running.
 - Verify domain ownership in both platforms
 
 ### Support:
-- **Vercel**: https://vercel.com/support
+- **Netlify**: https://www.netlify.com/support/
 - **Render**: https://render.com/docs/support
 - **Django**: https://docs.djangoproject.com/
 - **Next.js**: https://nextjs.org/docs
 
 ## Cost Estimate (Free Tier)
 - **Render**: $0/month (750 hours, PostgreSQL free tier)
-- **Vercel**: $0/month (100GB bandwidth, 1000GB hours)
+- **Netlify**: $0/month (100GB bandwidth, 300 minutes build time)
 - **Domain**: ~$10-15/year at Namecheap
 - **SSL**: Free with both platforms
 
 ## Quick Deployment Commands
 
 ```bash
-# Deploy frontend to Vercel
+# Deploy frontend to Netlify
 cd frontend
 npm install
 npm run build
-vercel --prod
+netlify deploy --prod --dir=out
 
 # Backend deploys automatically via Render when you push to GitHub
 ```

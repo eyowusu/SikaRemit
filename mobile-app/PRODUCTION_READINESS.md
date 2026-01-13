@@ -9,10 +9,8 @@ This document summarizes the current state of the mobile app's payment integrati
 ### Payment Services
 | Service | Status | Description |
 |---------|--------|-------------|
-| `paymentGateway.ts` | ✅ Ready | Unified abstraction for Paystack, Stripe, Flutterwave |
-| `paystackService.ts` | ✅ Ready | Card payments, Mobile Money, Bank transfers |
+| `paymentGateway.ts` | ✅ Ready | Unified abstraction for Stripe |
 | `stripeService.ts` | ✅ Ready | Card payments, Payment intents |
-| `flutterwaveService.ts` | ✅ Ready | Card, Mobile Money, Bank transfers |
 | `mobileMoneyService.ts` | ✅ Ready | MTN MoMo, Telecel Cash, AirtelTigo Money |
 | `billPaymentService.ts` | ✅ Ready | Electricity, Water, Internet, TV bills |
 | `exchangeRateService.ts` | ✅ Ready | Dynamic forex rates, fee calculations |
@@ -41,26 +39,15 @@ This document summarizes the current state of the mobile app's payment integrati
 | `offlineService.ts` | ✅ Ready | Offline transaction queue |
 | `kycService.ts` | ✅ Ready | KYC document upload and verification |
 
-## ⚠️ Production Requirements
+## Production Requirements
 
 ### 1. API Keys Configuration
 Replace test keys with production keys in environment:
 
 ```javascript
-// paystackService.ts - Line 7-8
-PAYSTACK_CONFIG = {
-  PUBLIC_KEY: 'pk_live_xxxxx', // Get from Paystack Dashboard
-  SECRET_KEY: 'sk_live_xxxxx', // Store in backend only
-}
-
-// stripeService.ts
+// stripeService.ts - Line 7-8
 STRIPE_CONFIG = {
   PUBLISHABLE_KEY: 'pk_live_xxxxx', // Get from Stripe Dashboard
-}
-
-// flutterwaveService.ts
-FLUTTERWAVE_CONFIG = {
-  PUBLIC_KEY: 'FLWPUBK_xxxxx', // Get from Flutterwave Dashboard
 }
 ```
 
@@ -106,9 +93,7 @@ New packages added:
 Create `.env` file:
 ```
 API_BASE_URL=https://api.sikaremit.com
-PAYSTACK_PUBLIC_KEY=pk_live_xxxxx
 STRIPE_PUBLISHABLE_KEY=pk_live_xxxxx
-FLUTTERWAVE_PUBLIC_KEY=FLWPUBK_xxxxx
 EXPO_PROJECT_ID=your-expo-project-id
 ```
 
@@ -126,7 +111,7 @@ EXPO_PROJECT_ID=your-expo-project-id
 
 ### Payment Flow Testing
 - [ ] Mobile Money deposit (MTN, Telecel, AirtelTigo)
-- [ ] Card payment via Paystack/Stripe/Flutterwave
+- [ ] Card payment via Stripe
 - [ ] Bank transfer deposit
 - [ ] Local money transfer (P2P)
 - [ ] International remittance
@@ -166,9 +151,7 @@ EXPO_PROJECT_ID=your-expo-project-id
 ├─────────────────────────────────────────────────────────┤
 │  Services Layer                                         │
 │  ├── paymentGateway (unified interface)                 │
-│  │   ├── paystackService                                │
-│  │   ├── stripeService                                  │
-│  │   └── flutterwaveService                             │
+│  │   └── stripeService                                  │
 │  ├── mobileMoneyService                                 │
 │  ├── billPaymentService                                 │
 │  ├── exchangeRateService                                │
@@ -186,7 +169,7 @@ EXPO_PROJECT_ID=your-expo-project-id
 │                 (Django REST Framework)                 │
 ├─────────────────────────────────────────────────────────┤
 │  ├── Payment processing                                 │
-│  ├── Paystack/Stripe/Flutterwave webhooks               │
+│  ├── Stripe webhooks                                     │
 │  ├── Mobile Money API integration                       │
 │  ├── Bill payment providers                             │
 │  └── KYC verification                                   │

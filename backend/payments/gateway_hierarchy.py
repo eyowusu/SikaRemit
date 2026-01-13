@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 class GatewayType(Enum):
     """Types of payment gateways"""
-    MAJOR = 'major'  # Comprehensive payment processors (Stripe, Flutterwave, etc.)
+    MAJOR = 'major'  # Comprehensive payment processors (Stripe, etc.)
     SPECIALIZED = 'specialized'  # Single-purpose gateways (MTN direct, etc.)
 
 
@@ -69,31 +69,13 @@ class GatewayHierarchyRegistry:
     # Gateway configurations
     GATEWAYS = {
         # Major Gateways - Comprehensive payment processors
-        'flutterwave': GatewayConfig(
-            name='flutterwave',
-            type=GatewayType.MAJOR,
-            priority=GatewayPriority.PRIMARY,
-            supported_methods=['card', 'bank_transfer', 'mtn_momo', 'airtel_tigo', 'telecel'],
-            description='Pan-African payment processor with comprehensive coverage',
-            requires_config=['FLUTTERWAVE_SECRET_KEY', 'FLUTTERWAVE_PUBLIC_KEY']
-        ),
-
         'stripe': GatewayConfig(
             name='stripe',
             type=GatewayType.MAJOR,
-            priority=GatewayPriority.SECONDARY,
+            priority=GatewayPriority.PRIMARY,
             supported_methods=['card', 'digital_wallet', 'international'],
             description='Global payment processor with extensive international support',
             requires_config=['STRIPE_SECRET_KEY', 'STRIPE_PUBLISHABLE_KEY']
-        ),
-
-        'paystack': GatewayConfig(
-            name='paystack',
-            type=GatewayType.MAJOR,
-            priority=GatewayPriority.SECONDARY,
-            supported_methods=['card', 'bank_transfer', 'mtn_momo', 'airtel_tigo'],
-            description='African-focused payment processor with strong local presence',
-            requires_config=['PAYSTACK_SECRET_KEY', 'PAYSTACK_PUBLIC_KEY']
         ),
 
         # Specialized Gateways - Single-purpose implementations
@@ -158,7 +140,7 @@ class GatewayHierarchyRegistry:
             method_type='card',
             category=PaymentMethodCategory.CREDIT_DEBIT_CARDS,
             display_name='Credit/Debit Cards',
-            available_gateways=['flutterwave', 'stripe', 'paystack'],
+            available_gateways=['stripe'],
             icon='💳',
             description='Visa, Mastercard, and other international cards'
         ),
@@ -167,7 +149,7 @@ class GatewayHierarchyRegistry:
             method_type='bank_transfer',
             category=PaymentMethodCategory.BANK_TRANSFERS,
             display_name='Bank Transfer',
-            available_gateways=['flutterwave', 'paystack', 'bank_transfer'],
+            available_gateways=['bank_transfer'],
             icon='🏦',
             description='Direct bank account transfers'
         ),
@@ -176,7 +158,7 @@ class GatewayHierarchyRegistry:
             method_type='mtn_momo',
             category=PaymentMethodCategory.MOBILE_MONEY_GHANA,
             display_name='MTN Mobile Money',
-            available_gateways=['flutterwave', 'paystack', 'mtn_momo'],
+            available_gateways=['mtn_momo'],
             icon='📱',
             description='MTN Mobile Money payments'
         ),
@@ -185,7 +167,7 @@ class GatewayHierarchyRegistry:
             method_type='airtel_tigo',
             category=PaymentMethodCategory.MOBILE_MONEY_GHANA,
             display_name='AirtelTigo Money',
-            available_gateways=['flutterwave', 'paystack', 'airtel_tigo'],
+            available_gateways=['airtel_tigo'],
             icon='📱',
             description='AirtelTigo Money payments'
         ),
@@ -194,7 +176,7 @@ class GatewayHierarchyRegistry:
             method_type='telecel',
             category=PaymentMethodCategory.MOBILE_MONEY_GHANA,
             display_name='Telecel Cash',
-            available_gateways=['flutterwave', 'telecel'],
+            available_gateways=['telecel'],
             icon='📱',
             description='Telecel Cash payments'
         ),

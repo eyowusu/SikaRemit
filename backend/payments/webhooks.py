@@ -42,11 +42,7 @@ def bank_transfer_webhook(request):
         logger.info(f"Bank transfer webhook from {provider}: {data}")
 
         # Route to appropriate handler
-        if provider.lower() == 'flutterwave':
-            return _handle_flutterwave_bank_webhook(request, data)
-        elif provider.lower() == 'paystack':
-            return _handle_paystack_bank_webhook(request, data)
-        elif provider.lower() == 'direct_bank':
+        if provider.lower() == 'direct_bank':
             return _handle_direct_bank_webhook(request, data)
         else:
             # Try to auto-detect provider from payload structure
@@ -54,94 +50,6 @@ def bank_transfer_webhook(request):
 
     except Exception as e:
         logger.error(f"Bank transfer webhook error: {str(e)}")
-        return JsonResponse({'error': str(e)}, status=400)
-
-def _handle_flutterwave_bank_webhook(request, data):
-    """Handle Flutterwave bank transfer webhook"""
-    try:
-        # Verify Flutterwave signature
-        secret = getattr(settings, 'FLUTTERWAVE_WEBHOOK_SECRET', '')
-        if not secret:
-            logger.error("Flutterwave webhook secret not configured")
-            return JsonResponse({'error': 'Webhook secret not configured'}, status=500)
-
-        signature = request.META.get('HTTP_VERIF_HASH')
-        if not signature or signature != secret:
-            logger.warning("Invalid Flutterwave webhook signature")
-            return JsonResponse({'error': 'Invalid signature'}, status=401)
-
-        event = data.get('event')
-        tx_ref = data.get('data', {}).get('tx_ref')
-
-        if event == 'charge.completed' and tx_ref:
-            # Update transaction status
-            from .models.transaction import Transaction
-            try:
-                transaction = Transaction.objects.get(external_reference=tx_ref)
-                transaction.status = Transaction.COMPLETED
-                transaction.save()
-
-                # Send notification
-                _send_bank_transfer_notification(transaction, 'completed')
-
-                return JsonResponse({'status': 'success'})
-
-            except Transaction.DoesNotExist:
-                logger.warning(f"Transaction not found for Flutterwave reference: {tx_ref}")
-                return JsonResponse({'error': 'Transaction not found'}, status=404)
-
-        return JsonResponse({'status': 'ignored'})
-
-    except Exception as e:
-        logger.error(f"Flutterwave webhook processing error: {str(e)}")
-        return JsonResponse({'error': str(e)}, status=400)
-
-def _handle_paystack_bank_webhook(request, data):
-    """Handle Paystack bank transfer webhook"""
-    try:
-        # Verify Paystack signature
-        secret = getattr(settings, 'PAYSTACK_WEBHOOK_SECRET', '')
-        if not secret:
-            logger.error("Paystack webhook secret not configured")
-            return JsonResponse({'error': 'Webhook secret not configured'}, status=500)
-
-        signature = request.META.get('HTTP_X_PAYSTACK_SIGNATURE')
-        body = request.body
-
-        expected_signature = hmac.new(
-            secret.encode('utf-8'),
-            body,
-            hashlib.sha256
-        ).hexdigest()
-
-        if not hmac.compare_digest(expected_signature, signature):
-            logger.warning("Invalid Paystack webhook signature")
-            return JsonResponse({'error': 'Invalid signature'}, status=401)
-
-        event = data.get('event')
-        reference = data.get('data', {}).get('reference')
-
-        if event == 'charge.success' and reference:
-            # Update transaction status
-            from .models.transaction import Transaction
-            try:
-                transaction = Transaction.objects.get(external_reference=reference)
-                transaction.status = Transaction.COMPLETED
-                transaction.save()
-
-                # Send notification
-                _send_bank_transfer_notification(transaction, 'completed')
-
-                return JsonResponse({'status': 'success'})
-
-            except Transaction.DoesNotExist:
-                logger.warning(f"Transaction not found for Paystack reference: {reference}")
-                return JsonResponse({'error': 'Transaction not found'}, status=404)
-
-        return JsonResponse({'status': 'ignored'})
-
-    except Exception as e:
-        logger.error(f"Paystack webhook processing error: {str(e)}")
         return JsonResponse({'error': str(e)}, status=400)
 
 def _handle_direct_bank_webhook(request, data):
