@@ -25,6 +25,9 @@ urlpatterns = [
     
     # Authentication (allauth)
     path('accounts/', include('allauth.urls')),
+    
+    # Essential API routes
+    path('api/v1/accounts/', include('users.urls')),
 ]
 
 # Serve static files during development
