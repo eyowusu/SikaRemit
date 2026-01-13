@@ -1,20 +1,29 @@
-from django.db.models import Count, Sum
+from django.db import connection
 from django.utils import timezone
-from datetime import timedelta
-from users.models import User, Customer, Merchant
-from payments.models.transaction import Transaction
 from rest_framework.views import APIView
-from rest_framework.permissions import IsAdminUser, AllowAny, IsAuthenticated
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
-from rest_framework import viewsets
-from .models import Country
-from .serializers import CountrySerializer
 
 class HealthCheckView(APIView):
     permission_classes = [AllowAny]
     
     def get(self, request):
-        return Response({'status': 'healthy'})
+        try:
+            # Test database connection
+            with connection.cursor() as cursor:
+                cursor.execute("SELECT 1")
+            
+            return Response({
+                'status': 'healthy',
+                'database': 'connected',
+                'timestamp': timezone.now().isoformat()
+            })
+        except Exception as e:
+            return Response({
+                'status': 'unhealthy',
+                'error': str(e),
+                'timestamp': timezone.now().isoformat()
+            }, status=500)
 
 # Import from the middleware module file (not the package)
 from functools import wraps
