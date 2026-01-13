@@ -1,8 +1,21 @@
 from django.db import connection
 from django.utils import timezone
+from datetime import timedelta
+from django.contrib.auth import get_user_model
 from rest_framework.views import APIView
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
+from rest_framework import viewsets
+from .models import Country, SystemSettings
+from .serializers import CountrySerializer
+
+User = get_user_model()
+
+# Import Transaction model - try to avoid import errors
+try:
+    from payments.models.transaction import Transaction
+except ImportError:
+    Transaction = None
 
 class HealthCheckView(APIView):
     permission_classes = [AllowAny]
@@ -69,10 +82,13 @@ class AdminMetricsView(APIView):
     def get(self, request):
         # Calculate today's transactions
         today = timezone.now().date()
-        transactions_today = Transaction.objects.filter(
-            created_at__date=today,
-            status='completed'
-        ).count()
+        if Transaction is not None:
+            transactions_today = Transaction.objects.filter(
+                created_at__date=today,
+                status='completed'
+            ).count()
+        else:
+            transactions_today = 0
         
         # Get total users
         total_users = User.objects.count()
