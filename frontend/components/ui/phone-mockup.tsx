@@ -99,33 +99,33 @@ export function PhoneMockup() {
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-7 bg-gray-900 rounded-b-2xl z-20"></div>
         
         {/* Phone Screen */}
-        <div className="relative bg-background rounded-[2.5rem] overflow-hidden h-[580px] md:h-[620px]">
+        <div className="relative bg-white rounded-[2.5rem] overflow-hidden h-[580px] md:h-[620px]">
           {/* Status Bar */}
-          <div className="flex items-center justify-between px-6 py-3 bg-card border-b border-border">
-            <span className="text-xs font-medium text-muted-foreground">9:41</span>
+          <div className="flex items-center justify-between px-6 py-3 bg-white border-b border-gray-200">
+            <span className="text-xs font-medium text-gray-600">9:41</span>
             <div className="flex items-center gap-1">
-              <div className="w-4 h-2 bg-muted-foreground rounded-sm"></div>
-              <div className="w-4 h-2 bg-muted-foreground rounded-sm"></div>
+              <div className="w-4 h-2 bg-gray-600 rounded-sm"></div>
+              <div className="w-4 h-2 bg-gray-600 rounded-sm"></div>
               <div className="w-6 h-3 bg-green-500 rounded-sm"></div>
             </div>
           </div>
 
           {/* App Header */}
-          <div className="bg-card px-5 py-4 border-b border-border">
+          <div className="bg-white px-5 py-4 border-b border-gray-200">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center">
-                <Wallet className="w-5 h-5 text-primary-foreground" />
+              <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center overflow-hidden">
+                <img src="/logos/SikaRemit.jpeg" alt="SikaRemit" className="w-8 h-8 object-cover rounded-lg" />
               </div>
               <div>
-                <h3 className="font-bold text-foreground text-lg">SikaRemit</h3>
-                <p className="text-xs text-muted-foreground">Your Digital Wallet</p>
+                <h3 className="font-bold text-gray-900 text-lg">SikaRemit</h3>
+                <p className="text-xs text-gray-500">Your Digital Wallet</p>
               </div>
             </div>
           </div>
 
           {/* Balance Card */}
           <div className="px-4 py-4">
-            <div className="bg-gradient-to-br from-primary via-purple-600 to-pink-600 rounded-2xl p-5 text-white shadow-lg shadow-primary/30">
+            <div className="bg-gradient-to-br from-blue-600 via-purple-600 to-pink-600 rounded-2xl p-5 text-white shadow-lg">
               <p className="text-sm opacity-80 mb-1">Available Balance</p>
               <p className="text-3xl font-bold mb-3">GHS 2,450.00</p>
               <div className="flex gap-3">
@@ -144,32 +144,32 @@ export function PhoneMockup() {
           {/* Transactions */}
           <div className="px-4">
             <div className="flex items-center justify-between mb-3">
-              <h4 className="font-semibold text-foreground text-sm">Recent Transactions</h4>
-              <span className="text-xs text-primary font-medium">See all</span>
+              <h4 className="font-semibold text-gray-900 text-sm">Recent Transactions</h4>
+              <span className="text-xs text-blue-600 font-medium">See all</span>
             </div>
             
             <div className="space-y-2">
               {mockTransactions.map((transaction) => (
                 <div
                   key={transaction.id}
-                  className="flex items-center justify-between p-3 bg-card rounded-xl border border-border/50 hover:border-border transition-colors"
+                  className="flex items-center justify-between p-3 bg-white rounded-xl border border-gray-200 hover:border-gray-300 transition-colors"
                 >
                   <div className="flex items-center gap-3">
                     <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${getTransactionColor(transaction.type)}`}>
                       {getTransactionIcon(transaction.type)}
                     </div>
                     <div>
-                      <p className="font-medium text-foreground text-sm">{transaction.name}</p>
-                      <p className="text-xs text-muted-foreground">{transaction.date}</p>
+                      <p className="font-medium text-gray-900 text-sm">{transaction.name}</p>
+                      <p className="text-xs text-gray-500">{transaction.date}</p>
                     </div>
                   </div>
                   <div className="text-right">
                     <p className={`font-semibold text-sm ${
-                      transaction.amount.startsWith('+') ? 'text-green-500' : 'text-foreground'
+                      transaction.amount.startsWith('+') ? 'text-green-500' : 'text-gray-900'
                     }`}>
                       {transaction.amount}
                     </p>
-                    <p className="text-xs text-muted-foreground">{transaction.currency}</p>
+                    <p className="text-xs text-gray-500">{transaction.currency}</p>
                   </div>
                 </div>
               ))}
@@ -177,31 +177,31 @@ export function PhoneMockup() {
           </div>
 
           {/* Bottom Navigation */}
-          <div className="absolute bottom-0 left-0 right-0 bg-card border-t border-border px-6 py-3">
+          <div className="absolute bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-6 py-3">
             <div className="flex items-center justify-around">
               <div className="flex flex-col items-center gap-1">
-                <div className="w-6 h-6 bg-primary/10 rounded-lg flex items-center justify-center">
-                  <Wallet className="w-4 h-4 text-primary" />
+                <div className="w-6 h-6 bg-blue-50 rounded-lg flex items-center justify-center">
+                  <Wallet className="w-4 h-4 text-blue-600" />
                 </div>
-                <span className="text-[10px] text-primary font-medium">Home</span>
+                <span className="text-[10px] text-blue-600 font-medium">Home</span>
               </div>
               <div className="flex flex-col items-center gap-1">
                 <div className="w-6 h-6 rounded-lg flex items-center justify-center">
-                  <Send className="w-4 h-4 text-muted-foreground" />
+                  <Send className="w-4 h-4 text-gray-400" />
                 </div>
-                <span className="text-[10px] text-muted-foreground">Send</span>
+                <span className="text-[10px] text-gray-400">Send</span>
               </div>
               <div className="flex flex-col items-center gap-1">
                 <div className="w-6 h-6 rounded-lg flex items-center justify-center">
-                  <Receipt className="w-4 h-4 text-muted-foreground" />
+                  <Receipt className="w-4 h-4 text-gray-400" />
                 </div>
-                <span className="text-[10px] text-muted-foreground">History</span>
+                <span className="text-[10px] text-gray-400">History</span>
               </div>
               <div className="flex flex-col items-center gap-1">
                 <div className="w-6 h-6 rounded-lg flex items-center justify-center">
-                  <Smartphone className="w-4 h-4 text-muted-foreground" />
+                  <Smartphone className="w-4 h-4 text-gray-400" />
                 </div>
-                <span className="text-[10px] text-muted-foreground">More</span>
+                <span className="text-[10px] text-gray-400">More</span>
               </div>
             </div>
           </div>

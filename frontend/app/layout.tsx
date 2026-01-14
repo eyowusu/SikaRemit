@@ -53,59 +53,6 @@ export default function RootLayout({
         </div>
         <TooltipProvider>
           <Providers>
-            <header className="sticky top-0 z-50 w-full border-b border-white/20 bg-white/10 backdrop-blur-xl supports-[backdrop-filter]:bg-white/5 shadow-lg shadow-purple-500/5 relative">
-              <div className="max-w-7xl mx-auto flex h-16 items-center justify-between px-4 lg:px-8">
-                {/* Logo and Brand */}
-                <div className="flex items-center gap-6">
-                  <Link href="/" className="flex items-center space-x-3 group relative">
-                    <div className="relative">
-                      <div className="w-9 h-9 bg-gradient-to-r from-purple-600 via-purple-500 to-pink-500 rounded-xl flex items-center justify-center shadow-xl shadow-purple-500/25 group-hover:shadow-2xl group-hover:shadow-purple-500/40 transition-all duration-500 group-hover:scale-110">
-                        <Globe className="w-5 h-5 text-white group-hover:rotate-12 transition-transform duration-500" />
-                      </div>
-                      <div className="absolute -inset-1 bg-gradient-to-r from-purple-600/30 to-pink-500/30 rounded-xl blur-lg opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-                      <div className="absolute -inset-2 bg-gradient-to-r from-purple-600/20 to-pink-500/20 rounded-xl blur-xl opacity-0 group-hover:opacity-75 transition-opacity duration-700"></div>
-                    </div>
-                    <div>
-                      <span className="text-lg font-bold bg-gradient-to-r from-sikaremit-primary to-pink-500 bg-clip-text text-transparent drop-shadow-sm group-hover:from-pink-500 group-hover:to-purple-600 transition-all duration-500">
-                        SikaRemit
-                      </span>
-                      <div className="text-xs text-sikaremit-muted -mt-1 hidden sm:block drop-shadow-sm opacity-90 group-hover:opacity-100 transition-opacity duration-300">
-                        Secure Payments
-                      </div>
-                    </div>
-                  </Link>
-
-                  {/* Desktop Navigation */}
-                  <div className="hidden lg:block">
-                    <EnhancedMainNav />
-                  </div>
-                </div>
-
-                {/* Right Side Actions */}
-                <div className="flex items-center gap-4">
-                  {/* Notification Bell */}
-                  <NotificationBell />
-
-                  {/* User Menu */}
-                  <div className="hidden md:block">
-                    <UserMenu />
-                  </div>
-
-                  {/* Mobile Menu */}
-                  <div className="lg:hidden">
-                    <MobileMenu />
-                  </div>
-                </div>
-              </div>
-
-              {/* Breadcrumb Navigation */}
-              <div className="border-t border-white/20 bg-white/5 backdrop-blur-sm shadow-sm shadow-purple-500/5">
-                <div className="max-w-7xl mx-auto px-4 lg:px-8 py-2">
-                  <BreadcrumbNav />
-                </div>
-              </div>
-            </header>
-
             <main className="flex-1">
               <div className="max-w-7xl mx-auto px-4 lg:px-8 py-6 min-h-[calc(100vh-8rem)]">
                 <EnhancedErrorBoundary>
@@ -114,13 +61,13 @@ export default function RootLayout({
               </div>
             </main>
 
-            <footer className="border-t border-white/20 bg-white/10 backdrop-blur-xl supports-[backdrop-filter]:bg-white/5 shadow-lg shadow-purple-500/5 relative z-10">
+            <footer className="border-t border-gray-200 bg-gray-50 relative z-10">
               <div className="max-w-7xl mx-auto px-4 lg:px-8 py-8">
                 <div className="grid gap-8 md:grid-cols-4">
                   <div className="md:col-span-2">
                     <div className="flex items-center space-x-3 mb-4 group">
-                      <div className="w-10 h-10 bg-gradient-to-r from-purple-600 via-purple-500 to-pink-500 rounded-xl flex items-center justify-center shadow-xl group-hover:shadow-2xl group-hover:scale-110 transition-all duration-300">
-                        <Globe className="w-6 h-6 text-white" />
+                      <div className="w-10 h-10 bg-gradient-to-r from-purple-600 via-purple-500 to-pink-500 rounded-xl flex items-center justify-center shadow-xl group-hover:shadow-2xl group-hover:scale-110 transition-all duration-300 overflow-hidden">
+                        <img src="/logos/SikaRemit.jpeg" alt="SikaRemit" className="w-8 h-8 object-cover rounded-lg" />
                       </div>
                       <div>
                         <span className="text-xl font-bold bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-transparent">SikaRemit</span>

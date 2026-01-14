@@ -1,74 +1,92 @@
 @import "tailwindcss";
 
-@theme {
-  --color-background: hsl(0 0% 98%);
-  --color-foreground: hsl(240 10% 3.9%);
-  --color-card: hsl(0 0% 100%);
-  --color-card-foreground: hsl(240 10% 3.9%);
-  --color-popover: hsl(0 0% 100%);
-  --color-popover-foreground: hsl(240 10% 3.9%);
-  --color-primary: hsl(250 84% 54%);
-  --color-primary-foreground: hsl(0 0% 100%);
-  --color-secondary: hsl(240 4.8% 95.9%);
-  --color-secondary-foreground: hsl(240 5.9% 10%);
-  --color-muted: hsl(240 4.8% 95.9%);
-  --color-muted-foreground: hsl(240 3.8% 46.1%);
-  --color-accent: hsl(240 4.8% 95.9%);
-  --color-accent-foreground: hsl(240 5.9% 10%);
-  --color-destructive: hsl(0 84.2% 60.2%);
-  --color-destructive-foreground: hsl(0 0% 100%);
-  --color-border: hsl(240 5.9% 90%);
-  --color-input: hsl(240 5.9% 90%);
-  --color-ring: hsl(250 84% 54%);
-  --radius: 0.75rem;
-  --shadow-revolut: 0 4px 24px -4px hsl(250 84% 54% / 0.25);
-  --shadow-revolut-lg: 0 8px 40px -8px hsl(250 84% 54% / 0.3);
-}
-
-/* SikaRemit - Revolut-Inspired Design System */
+/* SikaRemit - Revolut-Inspired Professional Design System */
 
 :root {
+  /* Revolut Brand Colors */
+  --revolut-blue: #0047FF;
+  --revolut-dark-blue: #002D6E;
+  --revolut-light-blue: #E6F0FF;
+  --revolut-purple: #8B5CF6;
+  --revolut-pink: #EC4899;
+  --revolut-teal: #14B8A6;
+  
+  /* Neutral Palette */
+  --revolut-black: #0A0B0D;
+  --revolut-dark-gray: #1A1B1E;
+  --revolut-gray: #6B7280;
+  --revolut-light-gray: #F3F4F6;
+  --revolut-white: #FFFFFF;
+  
+  /* Semantic Colors */
+  --revolut-success: #10B981;
+  --revolut-warning: #F59E0B;
+  --revolut-error: #EF4444;
+  --revolut-info: #3B82F6;
+  
+  /* System Variables - Mapped to Revolut Colors */
   --background: 0 0% 98%;
-  --foreground: 240 10% 3.9%;
+  --foreground: 220 13% 4%;
   --card: 0 0% 100%;
-  --card-foreground: 240 10% 3.9%;
+  --card-foreground: 220 13% 4%;
   --popover: 0 0% 100%;
-  --popover-foreground: 240 10% 3.9%;
-  --primary: 250 84% 54%;
+  --popover-foreground: 220 13% 4%;
+  --primary: 217 100% 50%;
   --primary-foreground: 0 0% 100%;
-  --secondary: 240 4.8% 95.9%;
-  --secondary-foreground: 240 5.9% 10%;
-  --muted: 240 4.8% 95.9%;
-  --muted-foreground: 240 3.8% 46.1%;
-  --accent: 240 4.8% 95.9%;
-  --accent-foreground: 240 5.9% 10%;
-  --destructive: 0 84.2% 60.2%;
+  --secondary: 220 13% 96%;
+  --secondary-foreground: 220 13% 10%;
+  --muted: 220 13% 96%;
+  --muted-foreground: 220 8% 46%;
+  --accent: 220 13% 96%;
+  --accent-foreground: 220 13% 10%;
+  --destructive: 0 84% 60%;
   --destructive-foreground: 0 0% 100%;
-  --border: 240 5.9% 90%;
-  --input: 240 5.9% 90%;
-  --ring: 250 84% 54%;
+  --border: 220 13% 90%;
+  --input: 220 13% 90%;
+  --ring: 217 100% 50%;
+  
+  /* Custom Revolut Variables */
+  --revolut-primary: var(--revolut-blue);
+  --revolut-primary-hover: var(--revolut-dark-blue);
+  --revolut-secondary: var(--revolut-light-gray);
+  --revolut-text-primary: var(--revolut-black);
+  --revolut-text-secondary: var(--revolut-gray);
+  --revolut-border: var(--revolut-light-gray);
+  --revolut-background: var(--revolut-white);
+  --revolut-surface: #FAFBFC;
+  --revolut-shadow: rgba(10, 11, 13, 0.08);
+  --revolut-shadow-hover: rgba(10, 11, 13, 0.12);
+  --revolut-shadow-active: rgba(10, 11, 13, 0.16);
 }
 
 .dark {
-  --background: 240 10% 4%;
+  --background: 220 13% 4%;
   --foreground: 0 0% 98%;
-  --card: 240 10% 6%;
+  --card: 220 13% 6%;
   --card-foreground: 0 0% 98%;
-  --popover: 240 10% 6%;
+  --popover: 220 13% 6%;
   --popover-foreground: 0 0% 98%;
-  --primary: 250 84% 60%;
+  --primary: 217 100% 60%;
   --primary-foreground: 0 0% 100%;
-  --secondary: 240 5% 15%;
+  --secondary: 220 5% 15%;
   --secondary-foreground: 0 0% 98%;
-  --muted: 240 5% 15%;
-  --muted-foreground: 240 5% 65%;
-  --accent: 240 5% 15%;
+  --muted: 220 5% 15%;
+  --muted-foreground: 220 5% 65%;
+  --accent: 220 5% 15%;
   --accent-foreground: 0 0% 98%;
   --destructive: 0 62.8% 50%;
   --destructive-foreground: 0 0% 100%;
-  --border: 240 5% 18%;
-  --input: 240 5% 18%;
-  --ring: 250 84% 60%;
+  --border: 220 5% 18%;
+  --input: 220 5% 18%;
+  --ring: 217 100% 60%;
+  
+  /* Dark mode Revolut variables */
+  --revolut-background: var(--revolut-dark-gray);
+  --revolut-surface: var(--revolut-black);
+  --revolut-border: #2A2D32;
+  --revolut-shadow: rgba(255, 255, 255, 0.05);
+  --revolut-shadow-hover: rgba(255, 255, 255, 0.08);
+  --revolut-shadow-active: rgba(255, 255, 255, 0.12);
 }
 
 * {
@@ -105,39 +123,52 @@ body {
   background: hsl(var(--muted-foreground) / 0.5);
 }
 
-/* Revolut Component Classes - Using direct CSS instead of @apply for custom colors */
+/* Revolut Component Classes - Professional Design System */
 
 .revolut-card {
-  background-color: hsl(var(--card));
-  border-radius: 1rem;
-  border: 1px solid hsl(var(--border) / 0.5);
-  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
-  transition: all 0.2s;
+  background-color: var(--revolut-background);
+  border-radius: 16px;
+  border: 1px solid var(--revolut-border);
+  box-shadow: 0 1px 3px var(--revolut-shadow);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .revolut-card:hover {
-  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
-  border-color: hsl(var(--border));
+  box-shadow: 0 4px 12px var(--revolut-shadow-hover);
+  border-color: var(--revolut-border);
+  transform: translateY(-1px);
 }
 
 .revolut-glass {
-  background-color: hsl(var(--card) / 0.8);
+  background-color: rgba(255, 255, 255, 0.8);
   backdrop-filter: blur(24px);
-  border-radius: 1rem;
-  border: 1px solid hsl(var(--border) / 0.3);
+  border-radius: 16px;
+  border: 1px solid rgba(243, 244, 246, 0.3);
+}
+
+.dark .revolut-glass {
+  background-color: rgba(26, 27, 30, 0.8);
+  border-color: rgba(42, 45, 50, 0.3);
 }
 
 .revolut-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 0.75rem;
-  font-weight: 500;
-  transition: all 0.2s;
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 16px;
+  line-height: 1.5;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+  border: none;
+  outline: none;
+  position: relative;
+  overflow: hidden;
 }
 
 .revolut-btn:focus-visible {
-  outline: 2px solid hsl(var(--ring));
+  outline: 2px solid var(--revolut-primary);
   outline-offset: 2px;
 }
 
@@ -147,66 +178,90 @@ body {
 }
 
 .revolut-btn-primary {
-  background-color: hsl(var(--primary));
-  color: hsl(var(--primary-foreground));
-  box-shadow: 0 10px 15px -3px hsl(var(--primary) / 0.25);
+  background-color: var(--revolut-primary);
+  color: var(--revolut-background);
+  box-shadow: 0 2px 8px var(--revolut-shadow);
+  min-height: 48px;
+  padding: 12px 24px;
 }
 
 .revolut-btn-primary:hover {
-  background-color: hsl(var(--primary) / 0.9);
-  box-shadow: 0 20px 25px -5px hsl(var(--primary) / 0.3);
+  background-color: var(--revolut-primary-hover);
+  box-shadow: 0 4px 16px var(--revolut-shadow-hover);
+  transform: translateY(-1px);
+}
+
+.revolut-btn-primary:active {
+  box-shadow: 0 2px 8px var(--revolut-shadow-active);
+  transform: translateY(0);
 }
 
 .revolut-btn-secondary {
-  background-color: hsl(var(--secondary));
-  color: hsl(var(--secondary-foreground));
+  background-color: var(--revolut-secondary);
+  color: var(--revolut-text-primary);
+  border: 1px solid var(--revolut-border);
+  min-height: 48px;
+  padding: 12px 24px;
 }
 
 .revolut-btn-secondary:hover {
-  background-color: hsl(var(--secondary) / 0.8);
+  background-color: var(--revolut-light-gray);
+  border-color: var(--revolut-primary);
+  color: var(--revolut-primary);
+  transform: translateY(-1px);
+}
+
+.revolut-btn-ghost {
+  background-color: transparent;
+  color: var(--revolut-text-secondary);
+  min-height: 48px;
+  padding: 12px 24px;
 }
 
 .revolut-btn-ghost:hover {
-  background-color: hsl(var(--accent));
-  color: hsl(var(--accent-foreground));
+  background-color: var(--revolut-secondary);
+  color: var(--revolut-text-primary);
 }
 
 .revolut-input {
   display: flex;
-  height: 3rem;
+  height: 48px;
   width: 100%;
-  border-radius: 0.75rem;
-  border: 1px solid hsl(var(--input));
-  background-color: hsl(var(--background));
-  padding: 0.75rem 1rem;
-  font-size: 0.875rem;
-  transition: all 0.2s;
+  border-radius: 12px;
+  border: 1px solid var(--revolut-border);
+  background-color: var(--revolut-background);
+  padding: 12px 16px;
+  font-size: 16px;
+  line-height: 1.5;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  color: var(--revolut-text-primary);
 }
 
 .revolut-input::placeholder {
-  color: hsl(var(--muted-foreground));
+  color: var(--revolut-text-secondary);
 }
 
 .revolut-input:focus-visible {
-  outline: 2px solid hsl(var(--ring));
-  outline-offset: 0;
-  border-color: hsl(var(--primary));
+  outline: none;
+  border-color: var(--revolut-primary);
+  box-shadow: 0 0 0 3px rgba(0, 71, 255, 0.1);
 }
 
 .revolut-input:disabled {
   cursor: not-allowed;
   opacity: 0.5;
+  background-color: var(--revolut-secondary);
 }
 
 .revolut-section {
-  padding-top: 4rem;
-  padding-bottom: 4rem;
+  padding-top: 80px;
+  padding-bottom: 80px;
 }
 
 @media (min-width: 768px) {
   .revolut-section {
-    padding-top: 6rem;
-    padding-bottom: 6rem;
+    padding-top: 120px;
+    padding-bottom: 120px;
   }
 }
 
@@ -214,96 +269,123 @@ body {
   width: 100%;
   margin-left: auto;
   margin-right: auto;
-  padding-left: 1rem;
-  padding-right: 1rem;
+  padding-left: 24px;
+  padding-right: 24px;
 }
 
 @media (min-width: 768px) {
   .revolut-container {
-    padding-left: 1.5rem;
-    padding-right: 1.5rem;
+    padding-left: 32px;
+    padding-right: 32px;
   }
 }
 
 @media (min-width: 1024px) {
   .revolut-container {
-    padding-left: 2rem;
-    padding-right: 2rem;
-    max-width: 1280px;
+    padding-left: 40px;
+    padding-right: 40px;
+    max-width: 1200px;
+  }
+}
+
+@media (min-width: 1280px) {
+  .revolut-container {
+    max-width: 1400px;
   }
 }
 
 .revolut-heading {
-  font-size: 1.875rem;
+  font-size: 48px;
   font-weight: 700;
-  letter-spacing: -0.025em;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  color: var(--revolut-text-primary);
+  margin-bottom: 24px;
 }
 
 @media (min-width: 768px) {
   .revolut-heading {
-    font-size: 2.25rem;
+    font-size: 56px;
   }
 }
 
 @media (min-width: 1024px) {
   .revolut-heading {
-    font-size: 3rem;
+    font-size: 64px;
   }
 }
 
 .revolut-subheading {
-  font-size: 1.125rem;
-  color: hsl(var(--muted-foreground));
+  font-size: 20px;
+  line-height: 1.6;
+  color: var(--revolut-text-secondary);
+  font-weight: 400;
+  margin-bottom: 32px;
 }
 
 @media (min-width: 768px) {
   .revolut-subheading {
-    font-size: 1.25rem;
+    font-size: 22px;
   }
 }
 
 .revolut-badge {
   display: inline-flex;
   align-items: center;
-  border-radius: 9999px;
-  padding: 0.25rem 0.75rem;
-  font-size: 0.75rem;
-  font-weight: 500;
-  background-color: hsl(var(--primary) / 0.1);
-  color: hsl(var(--primary));
+  border-radius: 24px;
+  padding: 6px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  background-color: var(--revolut-light-blue);
+  color: var(--revolut-primary);
+  border: 1px solid var(--revolut-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .revolut-gradient-text {
-  background: linear-gradient(to right, hsl(var(--primary)), hsl(280 84% 60%), hsl(330 84% 60%));
+  background: linear-gradient(135deg, var(--revolut-primary), var(--revolut-purple), var(--revolut-pink));
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+  font-weight: 700;
 }
 
 .revolut-stat {
-  background-color: hsl(var(--card));
-  border-radius: 1rem;
-  border: 1px solid hsl(var(--border) / 0.5);
-  padding: 1.5rem;
+  background-color: var(--revolut-background);
+  border-radius: 16px;
+  border: 1px solid var(--revolut-border);
+  padding: 32px 24px;
   text-align: center;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.revolut-stat:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px var(--revolut-shadow-hover);
+  border-color: var(--revolut-primary);
 }
 
 .revolut-stat-value {
-  font-size: 1.875rem;
+  font-size: 48px;
   font-weight: 700;
-  color: hsl(var(--foreground));
+  color: var(--revolut-text-primary);
+  line-height: 1;
+  margin-bottom: 8px;
 }
 
 @media (min-width: 768px) {
   .revolut-stat-value {
-    font-size: 2.25rem;
+    font-size: 56px;
   }
 }
 
 .revolut-stat-label {
-  font-size: 0.875rem;
-  color: hsl(var(--muted-foreground));
-  margin-top: 0.25rem;
+  font-size: 16px;
+  color: var(--revolut-text-secondary);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .revolut-nav {
@@ -311,24 +393,52 @@ body {
   top: 0;
   z-index: 50;
   width: 100%;
-  border-bottom: 1px solid hsl(var(--border) / 0.4);
-  background-color: hsl(var(--background) / 0.8);
+  border-bottom: 1px solid var(--revolut-border);
+  background-color: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(24px);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.dark .revolut-nav {
+  background-color: rgba(26, 27, 30, 0.95);
+  border-color: var(--revolut-border);
 }
 
 .revolut-nav-link {
-  font-size: 0.875rem;
+  font-size: 16px;
   font-weight: 500;
-  color: hsl(var(--muted-foreground));
-  transition: color 0.2s;
+  color: var(--revolut-text-secondary);
+  transition: color 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  text-decoration: none;
+  position: relative;
 }
 
 .revolut-nav-link:hover {
-  color: hsl(var(--foreground));
+  color: var(--revolut-text-primary);
+}
+
+.revolut-nav-link::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  width: 0;
+  height: 2px;
+  background-color: var(--revolut-primary);
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.revolut-nav-link:hover::after {
+  width: 100%;
 }
 
 .revolut-nav-link-active {
-  color: hsl(var(--foreground));
+  color: var(--revolut-primary);
+  font-weight: 600;
+}
+
+.revolut-nav-link-active::after {
+  width: 100%;
 }
 
 .revolut-sidebar {
