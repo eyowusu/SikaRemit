@@ -169,59 +169,61 @@ export default function Home() {
         {/* Hero Section - Revolut Style */}
         <section className="relative overflow-hidden bg-gradient-to-br from-blue-50 via-white to-purple-50">
           <div className="revolut-container relative z-10">
-            <div className="grid lg:grid-cols-2 gap-16 lg:gap-20 items-center min-h-[90vh] py-20">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-20 items-center min-h-[80vh] lg:min-h-[90vh] py-8 lg:py-20">
               {/* Left Content */}
-              <div className="text-center lg:text-left space-y-8">
+              <div className="text-center space-y-6 lg:space-y-8 order-2 lg:order-1">
                 <div className="inline-flex items-center space-x-2 px-4 py-2 bg-blue-100 text-blue-700 rounded-full text-sm font-semibold">
                   <Sparkles className="w-4 h-4" />
                   <span>Trusted by 50,000+ businesses</span>
                 </div>
                 
-                <h1 className="text-5xl lg:text-6xl xl:text-7xl font-bold text-gray-900 leading-tight">
+                <h1 className="text-3xl sm:text-4xl lg:text-6xl xl:text-7xl font-bold text-gray-900 leading-tight">
                   Change the way you
                   <span className="block text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600 mt-2">
                     handle money
                   </span>
                 </h1>
                 
-                <p className="text-xl text-gray-600 leading-relaxed max-w-2xl">
+                <p className="text-lg lg:text-xl text-gray-600 leading-relaxed max-w-2xl mx-auto">
                   Home or away, local or global — move freely between countries and currencies. 
                   Sign up for free, in a tap.
                 </p>
                 
-                <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
+                <div className="flex flex-col sm:flex-row gap-4 justify-center">
                   <Link href="/auth">
-                    <Button size="lg" className="h-14 px-8 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-lg group">
+                    <Button size="lg" className="h-12 px-6 sm:h-14 sm:px-8 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-base sm:text-lg group w-full sm:w-auto">
                       Download the app
-                      <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform duration-200" />
+                      <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 ml-2 group-hover:translate-x-1 transition-transform duration-200" />
                     </Button>
                   </Link>
                   <Link href="#features">
-                    <Button variant="outline" size="lg" className="h-14 px-8 border-gray-300 text-gray-700 hover:bg-gray-50 font-semibold text-lg">
+                    <Button variant="outline" size="lg" className="h-12 px-6 sm:h-14 sm:px-8 border-gray-300 text-gray-700 hover:bg-gray-50 font-semibold text-base sm:text-lg w-full sm:w-auto">
                       Learn more
                     </Button>
                   </Link>
                 </div>
                 
-                <div className="flex flex-col sm:flex-row gap-6 justify-center lg:justify-start text-sm text-gray-600">
-                  <div className="flex items-center space-x-2">
-                    <CheckCircle className="w-5 h-5 text-green-500" />
+                <div className="flex flex-col sm:flex-row gap-4 justify-center text-sm text-gray-600">
+                  <div className="flex items-center justify-center space-x-2">
+                    <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-green-500" />
                     <span>No setup fees</span>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <CheckCircle className="w-5 h-5 text-green-500" />
+                  <div className="flex items-center justify-center space-x-2">
+                    <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-green-500" />
                     <span>30-day free trial</span>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <CheckCircle className="w-5 h-5 text-green-500" />
+                  <div className="flex items-center justify-center space-x-2">
+                    <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-green-500" />
                     <span>Cancel anytime</span>
                   </div>
                 </div>
               </div>
 
               {/* Right Content - Phone Mockup */}
-              <div className="hidden lg:flex justify-center lg:justify-end">
-                <PhoneMockup />
+              <div className="flex justify-center order-1 lg:order-2 mb-6 lg:mb-0">
+                <div className="w-[200px] sm:w-[240px] md:w-[280px] lg:w-[320px]">
+                  <PhoneMockup />
+                </div>
               </div>
             </div>
           </div>
@@ -235,22 +237,22 @@ export default function Home() {
         <section className="py-20 bg-white border-y border-gray-100">
           <div className="revolut-container">
             <div className="text-center mb-16">
-              <h2 className="text-4xl lg:text-5xl font-bold text-gray-900 mb-4">
+              <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 mb-4">
                 Trusted by industry leaders
               </h2>
-              <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+              <p className="text-lg lg:text-xl text-gray-600 max-w-3xl mx-auto">
                 Join thousands of businesses that have transformed their payment operations with SikaRemit
               </p>
             </div>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-8">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-8">
               {stats.map((stat, index) => (
                 <div key={index} className="text-center group">
-                  <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform duration-300">
-                    <stat.icon className="w-8 h-8 text-white" />
+                  <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-4 sm:mb-6 group-hover:scale-110 transition-transform duration-300">
+                    <stat.icon className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
                   </div>
-                  <div className="text-4xl lg:text-5xl font-bold text-gray-900 mb-2">{stat.value}</div>
-                  <div className="text-lg font-semibold text-gray-700 mb-1">{stat.label}</div>
-                  <div className="text-sm text-gray-500">{stat.description}</div>
+                  <div className="text-2xl sm:text-3xl lg:text-5xl font-bold text-gray-900 mb-2">{stat.value}</div>
+                  <div className="text-sm sm:text-base lg:text-lg font-semibold text-gray-700 mb-1">{stat.label}</div>
+                  <div className="text-xs sm:text-sm text-gray-500">{stat.description}</div>
                 </div>
               ))}
             </div>
@@ -265,25 +267,25 @@ export default function Home() {
                 <Sparkles className="w-4 h-4" />
                 <span>Powerful Features</span>
               </div>
-              <h2 className="text-4xl lg:text-5xl font-bold text-gray-900 mb-4">
+              <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 mb-4">
                 Everything you need to manage money
               </h2>
-              <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+              <p className="text-lg lg:text-xl text-gray-600 max-w-3xl mx-auto">
                 From everyday payments to international transfers, we've got you covered with tools designed for modern businesses.
               </p>
             </div>
             
-            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-8">
               {features.map((feature, index) => (
                 <Card key={index} className="group hover:shadow-xl transition-all duration-300 border-gray-200 bg-white">
-                  <CardContent className="p-8">
-                    <div className={`w-16 h-16 bg-gradient-to-br from-${feature.color}-500 to-${feature.color}-600 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300`}>
-                      <feature.icon className="w-8 h-8 text-white" />
+                  <CardContent className="p-6 sm:p-8">
+                    <div className={`w-12 h-12 sm:w-16 sm:h-16 bg-gradient-to-br from-${feature.color}-500 to-${feature.color}-600 rounded-2xl flex items-center justify-center mb-4 sm:mb-6 group-hover:scale-110 transition-transform duration-300`}>
+                      <feature.icon className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
                     </div>
-                    <h3 className="text-xl font-bold text-gray-900 mb-3">
+                    <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-3">
                       {feature.title}
                     </h3>
-                    <p className="text-gray-600 leading-relaxed">
+                    <p className="text-sm sm:text-base text-gray-600 leading-relaxed">
                       {feature.description}
                     </p>
                   </CardContent>
@@ -298,23 +300,23 @@ export default function Home() {
           <div className="absolute inset-0 bg-gradient-to-br from-blue-600 to-purple-600"></div>
           <div className="revolut-container text-center relative z-10">
             <div className="max-w-4xl mx-auto">
-              <h2 className="text-4xl lg:text-5xl font-bold text-white mb-6">
+              <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white mb-6">
                 Ready to transform your
                 <br />
                 payment experience?
               </h2>
-              <p className="text-white/90 text-xl mb-10 leading-relaxed">
+              <p className="text-white/90 text-lg lg:text-xl mb-10 leading-relaxed">
                 Join thousands of businesses already using SikaRemit to streamline their financial operations.
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center mb-8">
                 <Link href="/auth">
-                  <Button size="lg" className="h-14 px-8 bg-white text-blue-600 hover:bg-gray-100 font-semibold text-lg group">
+                  <Button size="lg" className="h-12 px-6 sm:h-14 sm:px-8 bg-white text-blue-600 hover:bg-gray-100 font-semibold text-base sm:text-lg group w-full sm:w-auto">
                     Start Your Free Trial
-                    <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform duration-200" />
+                    <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 ml-2 group-hover:translate-x-1 transition-transform duration-200" />
                   </Button>
                 </Link>
                 <Link href="/contact">
-                  <Button size="lg" variant="outline" className="h-14 px-8 border-white/30 text-white hover:bg-white/10 font-semibold text-lg">
+                  <Button size="lg" variant="outline" className="h-12 px-6 sm:h-14 sm:px-8 border-white/30 text-white hover:bg-white/10 font-semibold text-base sm:text-lg w-full sm:w-auto">
                     Contact Sales
                   </Button>
                 </Link>
