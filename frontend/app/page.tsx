@@ -220,7 +220,7 @@ export default function Home() {
               </div>
 
               {/* Right Content - Phone Mockup */}
-              <div className="flex justify-center order-1 lg:order-2 mb-6 lg:mb-0">
+              <div className="flex justify-center items-center order-1 lg:order-2 mb-6 lg:mb-0">
                 <div className="w-[200px] sm:w-[240px] md:w-[280px] lg:w-[320px]">
                   <PhoneMockup />
                 </div>

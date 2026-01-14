@@ -63,8 +63,8 @@ export default function RootLayout({
 
             <footer className="border-t border-gray-200 bg-gray-50 relative z-10">
               <div className="max-w-7xl mx-auto px-4 lg:px-8 py-8">
-                <div className="grid gap-8 md:grid-cols-4">
-                  <div className="md:col-span-2">
+                <div className="grid gap-8 grid-cols-1 md:grid-cols-2 lg:grid-cols-4">
+                  <div className="lg:col-span-2">
                     <div className="flex items-center space-x-3 mb-4 group">
                       <div className="w-10 h-10 bg-gradient-to-r from-purple-600 via-purple-500 to-pink-500 rounded-xl flex items-center justify-center shadow-xl group-hover:shadow-2xl group-hover:scale-110 transition-all duration-300 overflow-hidden">
                         <img src="/logos/SikaRemit.jpeg" alt="SikaRemit" className="w-8 h-8 object-cover rounded-lg" />
@@ -114,11 +114,16 @@ export default function RootLayout({
 
                 <Separator className="my-8 bg-white/20" />
 
-                <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-                  <p className="text-muted-foreground text-sm">
-                    © 2025 SikaRemit. All rights reserved.
-                  </p>
-                  <div className="flex flex-wrap gap-6 text-sm text-muted-foreground">
+                <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-center md:text-left">
+                  <div className="flex flex-col md:flex-row md:items-center space-y-2 md:space-y-0 md:space-x-4">
+                    <p className="text-muted-foreground text-sm">
+                      © 2025 SikaRemit. All rights reserved.
+                    </p>
+                    <p className="text-muted-foreground text-sm">
+                      Powered by PayGlobe
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-6 text-sm text-muted-foreground justify-center md:justify-start">
                     <Link href="/privacy" className="hover:text-sikaremit-primary transition-all duration-300 hover:scale-105 relative group">Privacy Policy<span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-sikaremit-primary to-pink-500 group-hover:w-full transition-all duration-300"></span></Link>
                     <Link href="/terms" className="hover:text-sikaremit-primary transition-all duration-300 hover:scale-105 relative group">Terms of Service<span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-sikaremit-primary to-pink-500 group-hover:w-full transition-all duration-300"></span></Link>
                     <Link href="/compliance" className="hover:text-sikaremit-primary transition-all duration-300 hover:scale-105 relative group">Compliance<span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-sikaremit-primary to-pink-500 group-hover:w-full transition-all duration-300"></span></Link>
