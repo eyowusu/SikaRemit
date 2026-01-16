@@ -58,17 +58,24 @@ class SimpleCurrenciesView(APIView):
     permission_classes = [AllowAny]
     
     def get(self, request):
-        currencies = [
-            {'code': 'GHS', 'name': 'Ghana Cedi', 'symbol': '₵'},
-            {'code': 'USD', 'name': 'US Dollar', 'symbol': '$'},
-            {'code': 'EUR', 'name': 'Euro', 'symbol': '€'},
-            {'code': 'GBP', 'name': 'British Pound', 'symbol': '£'}
-        ]
-        return JsonResponse({
-            'success': True,
-            'data': currencies,
-            'results': currencies  # For frontend compatibility
-        })
+        try:
+            currencies = [
+                {'code': 'GHS', 'name': 'Ghana Cedi', 'symbol': '₵'},
+                {'code': 'USD', 'name': 'US Dollar', 'symbol': '$'},
+                {'code': 'EUR', 'name': 'Euro', 'symbol': '€'},
+                {'code': 'GBP', 'name': 'British Pound', 'symbol': '£'}
+            ]
+            return JsonResponse({
+                'success': True,
+                'data': currencies,
+                'results': currencies  # For frontend compatibility
+            })
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'error': str(e),
+                'results': []
+            }, status=500)
 
 urlpatterns = [
     # Root and Admin
