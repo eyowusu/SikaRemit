@@ -494,7 +494,7 @@ if IS_PRODUCTION:
         }
     
     # Use WhiteNoise for static files in production
-    STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+    STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
 else:
     # Development settings - relaxed security for easier testing
     CSRF_COOKIE_SECURE = False
