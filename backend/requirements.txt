@@ -58,3 +58,6 @@ django-axes==6.3.0
 
 # Social Authentication
 django-allauth==0.63.3
+
+# Redis cache
+django-redis==5.4.0
