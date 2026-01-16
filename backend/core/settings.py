@@ -12,6 +12,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 from dotenv import load_dotenv
 load_dotenv(BASE_DIR / '.env')
 
+import dj_database_url
+
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.environ.get('SECRET_KEY', None)
 
@@ -29,7 +31,7 @@ DEBUG = os.environ.get('DEBUG', 'True').lower() == 'true'
 # Environment detection
 IS_PRODUCTION = os.environ.get('ENVIRONMENT', 'development').lower() == 'production'
 
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1,sikaremit-api.onrender.com').split(',')
 
 CSRF_TRUSTED_ORIGINS = [
     'http://localhost:3000',
@@ -166,18 +168,29 @@ elif use_sqlite:
         }
     }
 else:
-    # Production database (PostgreSQL)
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.postgresql',
-            'NAME': 'SikaRemit',
-            'USER': 'postgres',
-            'PASSWORD': os.environ.get('DB_PASSWORD', None),  
-            'HOST': 'localhost',
-            'PORT': '5432',
-            'ATOMIC_REQUESTS': False,
+    # Production database configuration
+    DATABASE_URL = os.environ.get('DATABASE_URL')
+    if DATABASE_URL:
+        DATABASES = {
+            'default': dj_database_url.config(
+                default=DATABASE_URL,
+                conn_max_age=600,
+                ssl_require=True if DATABASE_URL.startswith('postgres://') else False
+            )
         }
-    }
+    else:
+        # Fallback to individual environment variables
+        DATABASES = {
+            'default': {
+                'ENGINE': 'django.db.backends.postgresql',
+                'NAME': os.environ.get('DB_NAME', 'SikaRemit'),
+                'USER': os.environ.get('DB_USER', 'postgres'),
+                'PASSWORD': os.environ.get('DB_PASSWORD'),  
+                'HOST': os.environ.get('DB_HOST', 'localhost'),
+                'PORT': os.environ.get('DB_PORT', '5432'),
+                'ATOMIC_REQUESTS': False,
+            }
+        }
 
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [
@@ -258,6 +271,7 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:3001",
     "http://127.0.0.1:3001",
     "https://sikaremit.netlify.app",
+    "https://sikaremit.com",
     "https://api.sikaremit.com",
 ]
 
