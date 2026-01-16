@@ -472,16 +472,25 @@ if IS_PRODUCTION:
     # X-Frame-Options
     X_FRAME_OPTIONS = 'DENY'
     
-    # Use Redis cache in production
-    CACHES = {
-        'default': {
-            'BACKEND': 'django_redis.cache.RedisCache',
-            'LOCATION': os.environ.get('REDIS_URL', 'redis://localhost:6379/1'),
-            'OPTIONS': {
-                'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+    # Use Redis cache in production if available, otherwise local memory
+    redis_url = os.environ.get('REDIS_URL')
+    if redis_url:
+        CACHES = {
+            'default': {
+                'BACKEND': 'django_redis.cache.RedisCache',
+                'LOCATION': redis_url,
+                'OPTIONS': {
+                    'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+                }
             }
         }
-    }
+    else:
+        CACHES = {
+            'default': {
+                'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+                'LOCATION': 'unique-snowflake-prod',
+            }
+        }
 else:
     # Development settings - relaxed security for easier testing
     CSRF_COOKIE_SECURE = False
