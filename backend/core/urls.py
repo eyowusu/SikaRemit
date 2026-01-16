@@ -88,7 +88,9 @@ urlpatterns = [
     
     # Simple API endpoints
     path('api/v1/accounts/login/', SimpleLoginView.as_view(), name='login'),
-    path('api/v1/payments/currencies/', SimpleCurrenciesView.as_view(), name='currencies'),
+    
+    # Payments API
+    path('api/v1/payments/', include('payments.urls')),
     
     # API Documentation
     path('api/schema/', SpectacularAPIView.as_view(permission_classes=[]), name='schema'),
