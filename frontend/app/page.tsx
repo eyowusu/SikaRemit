@@ -66,18 +66,15 @@ export default function Home() {
             <div className="revolut-container">
               <div className="flex items-center justify-between h-14 sm:h-16">
                 {/* Logo */}
-                <Link href="/" className="flex items-center space-x-3 group">
-                  <div className="relative">
+                <Link href="/" className="flex items-center gap-2 sm:gap-3 group">
+                  <div className="relative flex-shrink-0">
                     <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg group-hover:shadow-xl transition-all duration-300 group-hover:scale-105 overflow-hidden">
                       <img src="/logos/SikaRemit.jpeg" alt="SikaRemit" className="w-6 h-6 sm:w-8 sm:h-8 object-cover rounded-lg" />
                     </div>
                   </div>
-                  <div>
-                    <span className="text-lg sm:text-xl font-bold text-gray-900">
-                      SikaRemit
-                    </span>
-                    <div className="text-xs text-gray-500 -mt-0.5 hidden sm:block">Financial Technology</div>
-                  </div>
+                  <span className="text-lg sm:text-xl font-bold text-gray-900 whitespace-nowrap">
+                    SikaRemit
+                  </span>
                 </Link>
 
               {/* Desktop Navigation */}
@@ -220,8 +217,8 @@ export default function Home() {
               </div>
 
               {/* Right Content - Phone Mockup */}
-              <div className="flex justify-center items-center order-1 lg:order-2 mb-6 lg:mb-0">
-                <div className="w-[200px] sm:w-[240px] md:w-[280px] lg:w-[320px]">
+              <div className="flex justify-center items-center order-1 lg:order-2 mb-6 lg:mb-0 w-full">
+                <div className="w-[200px] sm:w-[240px] md:w-[280px] lg:w-[320px] mx-auto">
                   <PhoneMockup />
                 </div>
               </div>
@@ -330,82 +327,6 @@ export default function Home() {
           <div className="absolute top-10 left-10 w-40 h-40 bg-white/10 rounded-full blur-3xl"></div>
           <div className="absolute bottom-10 right-10 w-60 h-60 bg-white/5 rounded-full blur-3xl"></div>
         </section>
-
-        {/* Footer */}
-        <footer className="bg-gray-900 text-white py-10 sm:py-16">
-          <div className="revolut-container">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8 mb-8 sm:mb-12">
-              <div className="col-span-2 md:col-span-2">
-                <div className="flex items-center space-x-3 mb-4 sm:mb-6">
-                  <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
-                    <Globe className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
-                  </div>
-                  <div>
-                    <span className="text-xl sm:text-2xl font-bold text-white">SikaRemit</span>
-                    <div className="text-xs sm:text-sm text-gray-400">Financial Technology</div>
-                  </div>
-                </div>
-                <p className="text-gray-400 mb-4 sm:mb-6 text-sm sm:text-base leading-relaxed">
-                  Empowering businesses worldwide with secure, fast, and reliable payment processing solutions.
-                  Built for the future of digital commerce.
-                </p>
-                <div className="flex space-x-4">
-                  <Button variant="ghost" size="sm" className="text-gray-400 hover:text-white">
-                    <Globe className="w-4 h-4" />
-                  </Button>
-                  <Button variant="ghost" size="sm" className="text-gray-400 hover:text-white">
-                    <CreditCard className="w-4 h-4" />
-                  </Button>
-                  <Button variant="ghost" size="sm" className="text-gray-400 hover:text-white">
-                    <Shield className="w-4 h-4" />
-                  </Button>
-                </div>
-              </div>
-
-              <div>
-                <h3 className="font-semibold text-white mb-4">Product</h3>
-                <ul className="space-y-2 text-gray-400">
-                  <li><Link href="#features" className="hover:text-white transition-colors">Features</Link></li>
-                  <li><Link href="#pricing" className="hover:text-white transition-colors">Pricing</Link></li>
-                  <li><Link href="#security" className="hover:text-white transition-colors">Security</Link></li>
-                  <li><Link href="/api" className="hover:text-white transition-colors">API Docs</Link></li>
-                </ul>
-              </div>
-
-              <div>
-                <h3 className="font-semibold text-white mb-4">Company</h3>
-                <ul className="space-y-2 text-gray-400">
-                  <li><Link href="#about" className="hover:text-white transition-colors">About</Link></li>
-                  <li><Link href="/careers" className="hover:text-white transition-colors">Careers</Link></li>
-                  <li><Link href="/contact" className="hover:text-white transition-colors">Contact</Link></li>
-                  <li><Link href="/blog" className="hover:text-white transition-colors">Blog</Link></li>
-                </ul>
-              </div>
-            </div>
-
-            <div className="border-t border-gray-800 pt-8 flex flex-col md:flex-row justify-between items-center">
-              <div className="flex flex-col md:flex-row md:items-center space-y-2 md:space-y-0 md:space-x-4">
-                <p className="text-gray-400 text-sm">
-                  © 2025 SikaRemit. All rights reserved.
-                </p>
-                <p className="text-gray-400 text-sm">
-                  Powered by PayGlobe
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-4 sm:gap-6 mt-4 md:mt-0">
-                <Link href="/privacy" className="text-gray-400 hover:text-white text-sm transition-colors">
-                  Privacy Policy
-                </Link>
-                <Link href="/terms" className="text-gray-400 hover:text-white text-sm transition-colors">
-                  Terms of Service
-                </Link>
-                <Link href="/compliance" className="text-gray-400 hover:text-white text-sm transition-colors">
-                  Compliance
-                </Link>
-              </div>
-            </div>
-          </div>
-        </footer>
     </div>
     </TooltipProvider>
   )
