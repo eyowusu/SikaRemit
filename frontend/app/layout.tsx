@@ -10,9 +10,6 @@ import { NotificationBell } from '@/components/ui/notification-bell'
 import { UserMenu } from '@/components/UserMenu'
 import { MobileMenu } from '@/components/MobileMenu'
 import { TooltipProvider } from '@/components/ui/tooltip'
-import { Button } from '@/components/ui/button'
-import { Separator } from '@/components/ui/separator'
-import { Globe, CreditCard, Shield } from 'lucide-react'
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -59,83 +56,70 @@ export default function RootLayout({
               </EnhancedErrorBoundary>
             </main>
 
-            <footer className="border-t border-gray-200 bg-gray-50 relative z-10">
-              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
-                {/* Logo Section */}
-                <div className="mb-6">
-                  <div className="flex items-center space-x-3 mb-4">
-                    <div className="w-10 h-10 bg-gradient-to-r from-purple-600 via-purple-500 to-pink-500 rounded-xl flex items-center justify-center shadow-xl overflow-hidden">
-                      <img src="/logos/SikaRemit.jpeg" alt="SikaRemit" className="w-8 h-8 object-cover rounded-lg" />
-                    </div>
-                    <div>
-                      <span className="text-xl font-bold bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-transparent">SikaRemit</span>
-                      <div className="text-sm text-muted-foreground">Secure Payment Solutions</div>
-                    </div>
+            <footer style={{ borderTop: '1px solid #e5e7eb', backgroundColor: '#f9fafb', position: 'relative', zIndex: 10 }}>
+              <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '24px 16px' }}>
+                {/* Logo */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+                  <div style={{ width: '40px', height: '40px', background: 'linear-gradient(to right, #9333ea, #ec4899)', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                    <img src="/logos/SikaRemit.jpeg" alt="SikaRemit" style={{ width: '32px', height: '32px', objectFit: 'cover', borderRadius: '8px' }} />
                   </div>
-                  <p className="text-muted-foreground text-sm mb-4 max-w-md leading-relaxed">
-                    Empowering businesses worldwide with secure, fast, and reliable payment processing solutions.
-                  </p>
-                  <div className="flex space-x-3">
-                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                      <Globe className="h-4 w-4" />
-                    </Button>
-                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                      <CreditCard className="h-4 w-4" />
-                    </Button>
-                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                      <Shield className="h-4 w-4" />
-                    </Button>
+                  <div>
+                    <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#1f2937' }}>SikaRemit</div>
+                    <div style={{ fontSize: '12px', color: '#6b7280' }}>Secure Payment Solutions</div>
                   </div>
                 </div>
 
-                {/* Links Grid */}
-                <div className="grid grid-cols-2 gap-6 sm:grid-cols-4 mb-6">
-                  <div>
-                    <h3 className="font-semibold text-foreground text-sm mb-3">Product</h3>
-                    <ul className="space-y-2 text-sm text-muted-foreground">
-                      <li><Link href="#features" className="hover:text-sikaremit-primary">Features</Link></li>
-                      <li><Link href="#pricing" className="hover:text-sikaremit-primary">Pricing</Link></li>
-                      <li><Link href="#security" className="hover:text-sikaremit-primary">Security</Link></li>
-                      <li><Link href="/api" className="hover:text-sikaremit-primary">API Docs</Link></li>
-                    </ul>
-                  </div>
+                {/* Description */}
+                <p style={{ fontSize: '14px', color: '#6b7280', marginBottom: '24px', maxWidth: '400px' }}>
+                  Empowering businesses worldwide with secure, fast, and reliable payment processing solutions.
+                </p>
 
+                {/* Links - 2x2 grid on mobile */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '24px', marginBottom: '24px' }}>
                   <div>
-                    <h3 className="font-semibold text-foreground text-sm mb-3">Support</h3>
-                    <ul className="space-y-2 text-sm text-muted-foreground">
-                      <li><Link href="/faq" className="hover:text-sikaremit-primary">FAQ</Link></li>
-                      <li><Link href="/contact" className="hover:text-sikaremit-primary">Contact</Link></li>
-                      <li><Link href="/help" className="hover:text-sikaremit-primary">Help Center</Link></li>
-                      <li><Link href="/status" className="hover:text-sikaremit-primary">Status</Link></li>
-                    </ul>
+                    <div style={{ fontWeight: '600', fontSize: '14px', color: '#1f2937', marginBottom: '12px' }}>Product</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '14px', color: '#6b7280' }}>
+                      <Link href="#features">Features</Link>
+                      <Link href="#pricing">Pricing</Link>
+                      <Link href="#security">Security</Link>
+                      <Link href="/api">API Docs</Link>
+                    </div>
                   </div>
-
                   <div>
-                    <h3 className="font-semibold text-foreground text-sm mb-3">Company</h3>
-                    <ul className="space-y-2 text-sm text-muted-foreground">
-                      <li><Link href="/about" className="hover:text-sikaremit-primary">About</Link></li>
-                      <li><Link href="/careers" className="hover:text-sikaremit-primary">Careers</Link></li>
-                      <li><Link href="/blog" className="hover:text-sikaremit-primary">Blog</Link></li>
-                      <li><Link href="/press" className="hover:text-sikaremit-primary">Press</Link></li>
-                    </ul>
+                    <div style={{ fontWeight: '600', fontSize: '14px', color: '#1f2937', marginBottom: '12px' }}>Support</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '14px', color: '#6b7280' }}>
+                      <Link href="/faq">FAQ</Link>
+                      <Link href="/contact">Contact</Link>
+                      <Link href="/help">Help Center</Link>
+                      <Link href="/status">Status</Link>
+                    </div>
                   </div>
-
                   <div>
-                    <h3 className="font-semibold text-foreground text-sm mb-3">Legal</h3>
-                    <ul className="space-y-2 text-sm text-muted-foreground">
-                      <li><Link href="/privacy" className="hover:text-sikaremit-primary">Privacy</Link></li>
-                      <li><Link href="/terms" className="hover:text-sikaremit-primary">Terms</Link></li>
-                      <li><Link href="/compliance" className="hover:text-sikaremit-primary">Compliance</Link></li>
-                      <li><Link href="/cookies" className="hover:text-sikaremit-primary">Cookies</Link></li>
-                    </ul>
+                    <div style={{ fontWeight: '600', fontSize: '14px', color: '#1f2937', marginBottom: '12px' }}>Company</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '14px', color: '#6b7280' }}>
+                      <Link href="/about">About</Link>
+                      <Link href="/careers">Careers</Link>
+                      <Link href="/blog">Blog</Link>
+                      <Link href="/press">Press</Link>
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: '600', fontSize: '14px', color: '#1f2937', marginBottom: '12px' }}>Legal</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '14px', color: '#6b7280' }}>
+                      <Link href="/privacy">Privacy</Link>
+                      <Link href="/terms">Terms</Link>
+                      <Link href="/compliance">Compliance</Link>
+                      <Link href="/cookies">Cookies</Link>
+                    </div>
                   </div>
                 </div>
 
-                <Separator className="mb-6 bg-gray-200" />
+                {/* Divider */}
+                <div style={{ height: '1px', backgroundColor: '#e5e7eb', marginBottom: '16px' }}></div>
 
                 {/* Copyright */}
-                <div className="text-center text-xs sm:text-sm text-muted-foreground">
-                  <p>© 2025 SikaRemit. All rights reserved. Powered by PayGlobe</p>
+                <div style={{ textAlign: 'center', fontSize: '12px', color: '#6b7280' }}>
+                  © 2025 SikaRemit. All rights reserved. Powered by PayGlobe
                 </div>
               </div>
             </footer>
