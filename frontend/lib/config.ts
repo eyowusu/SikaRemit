@@ -9,6 +9,6 @@ export const DEV_CONFIG = {
 
 // API Configuration
 export const API_CONFIG = {
-  BASE_URL: process.env.NEXT_PUBLIC_API_URL || 'https://api.sikaremit.com',
+  BASE_URL: process.env.NEXT_PUBLIC_API_URL || 'https://sikaremit-api.onrender.com',
   TIMEOUT: 30000,
 };
