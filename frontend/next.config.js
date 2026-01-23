@@ -57,7 +57,7 @@ const nextConfig = {
   
   // Image optimization
   images: {
-    domains: ['api.sikaremit.com', 'localhost'],
+    domains: ['sikaremit-api.onrender.com', 'localhost'],
     formats: ['image/avif', 'image/webp'],
   },
   
