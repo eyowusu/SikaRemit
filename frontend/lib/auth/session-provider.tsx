@@ -23,8 +23,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     status: loading ? 'loading' : user ? 'authenticated' : 'unauthenticated'
   }
 
-  console.log('🎭 Session Provider - User:', user, 'Loading:', loading, 'Status:', session.status)
-
   return <SessionContext.Provider value={session}>{children}</SessionContext.Provider>
 }
 
