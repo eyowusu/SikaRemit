@@ -27,9 +27,20 @@ export default function RegisterPage() {
 
   const handleGoogleRegister = async () => {
     try {
-      // Redirect to backend Google OAuth endpoint with callback URL
-      const frontendUrl = window.location.origin
-      window.location.href = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/v1/accounts/google/?callback_url=${encodeURIComponent(frontendUrl)}`
+      // Direct frontend-initiated Google OAuth
+      const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID
+      const redirectUri = `${window.location.origin}/auth/callback/google`
+      const scope = 'openid email profile'
+      
+      const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
+        `client_id=${clientId}&` +
+        `redirect_uri=${encodeURIComponent(redirectUri)}&` +
+        `response_type=code&` +
+        `scope=${encodeURIComponent(scope)}&` +
+        `access_type=offline&` +
+        `prompt=consent`
+      
+      window.location.href = authUrl
     } catch (error) {
       console.error('Google sign in failed:', error)
       toast({
@@ -98,8 +109,8 @@ export default function RegisterPage() {
         <div className="bg-white border border-gray-200 rounded-2xl shadow-lg p-8">
           {/* Logo and Header */}
           <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl mb-4">
-              <Globe className="w-6 h-6 text-white" />
+            <div className="inline-flex items-center justify-center w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl mb-4 overflow-hidden">
+              <img src="/logos/SikaRemit.jpeg" alt="SikaRemit" className="w-9 h-9 object-cover rounded-lg" />
             </div>
             <h1 className="text-2xl font-bold text-gray-900 mb-2">Create Account</h1>
             <p className="text-gray-600">Join SikaRemit to access secure payment solutions</p>

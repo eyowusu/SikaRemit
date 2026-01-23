@@ -6,52 +6,16 @@ from django.views.generic import RedirectView
 from django.http import JsonResponse, HttpResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
+from accounts.views import MyTokenObtainPairView
 from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny
+from rest_framework_simplejwt.views import (
+    TokenRefreshView,
+)
 from drf_spectacular.views import SpectacularAPIView, SpectacularRedocView, SpectacularSwaggerView
-import json
 
 def simple_health_check(request):
     return JsonResponse({'status': 'healthy', 'message': 'Backend is running'})
-
-@method_decorator(csrf_exempt, name='dispatch')
-class SimpleLoginView(APIView):
-    permission_classes = [AllowAny]
-    
-    def post(self, request):
-        try:
-            data = json.loads(request.body)
-            email = data.get('email')
-            password = data.get('password')
-            
-            # Simple mock login for testing
-            if email == 'customer@test.com' and password == 'TestPassword123':
-                return JsonResponse({
-                    'status': 'success',
-                    'message': 'Login successful',
-                    'user': {
-                        'id': 1,
-                        'email': 'customer@test.com',
-                        'first_name': 'Test',
-                        'last_name': 'Customer',
-                        'is_verified': True
-                    },
-                    'tokens': {
-                        'access': 'mock-access-token',
-                        'refresh': 'mock-refresh-token'
-                    }
-                })
-            else:
-                return JsonResponse({
-                    'status': 'error',
-                    'message': 'Invalid credentials'
-                }, status=401)
-                
-        except Exception as e:
-            return JsonResponse({
-                'status': 'error',
-                'message': str(e)
-            }, status=400)
 
 @method_decorator(csrf_exempt, name='dispatch')
 class SimpleCurrenciesView(APIView):
@@ -86,11 +50,24 @@ urlpatterns = [
     path('health/', simple_health_check, name='health-check'),
     path('api/v1/health/', simple_health_check, name='api-health-check'),
     
-    # Simple API endpoints
-    path('api/v1/accounts/login/', SimpleLoginView.as_view(), name='login'),
+    # Simple API endpoints (keep login at root level for compatibility)
+    path('api/v1/accounts/login/', MyTokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('api/v1/accounts/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    
+    # Accounts API (includes customers, support tickets, etc.)
+    path('api/v1/accounts/', include('accounts.urls')),
     
     # Payments API
     path('api/v1/payments/', include('payments.urls')),
+
+    # Notifications API
+    path('api/v1/notifications/', include('notifications.urls')),
+
+    # Merchants API
+    path('api/v1/merchants/', include('merchants.urls')),
+    
+    # KYC API
+    path('api/v1/kyc/', include('kyc.urls')),
     
     # API Documentation
     path('api/schema/', SpectacularAPIView.as_view(permission_classes=[]), name='schema'),

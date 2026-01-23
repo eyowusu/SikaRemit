@@ -10,6 +10,7 @@ from payments.models.payment import Payment
 from django.utils.module_loading import import_string
 from django.core.exceptions import ValidationError
 from drf_spectacular.utils import extend_schema_serializer
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
 User = get_user_model()
 
@@ -88,9 +89,10 @@ class AccountsUserSerializer(serializers.ModelSerializer):
     created_at = serializers.DateTimeField(source='date_joined', read_only=True)
     
     def get_role(self, obj):
+        if obj.is_superuser or obj.is_staff:
+            return 'admin'
         role_mapping = {
-            1: 'admin',
-            2: 'merchant', 
+            2: 'merchant',
             3: 'customer'
         }
         return role_mapping.get(obj.user_type, 'customer')
@@ -437,4 +439,11 @@ class RecipientSerializer(serializers.ModelSerializer):
         # Map model fields to frontend expected field names
         data['accountNumber'] = instance.account_number
         data['bankName'] = instance.bank_name
+        return data
+
+class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
+    def validate(self, attrs):
+        data = super().validate(attrs)
+        serializer = AccountsUserSerializer(self.user)
+        data['user'] = serializer.data
         return data

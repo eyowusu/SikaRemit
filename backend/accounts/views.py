@@ -4,7 +4,7 @@ from rest_framework.decorators import action
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 from .serializers import (
-    UserLoginSerializer, UserRegisterSerializer, AccountsUserSerializer,
+    UserLoginSerializer, UserRegisterSerializer, AccountsUserSerializer, MyTokenObtainPairSerializer,
     CheckoutSerializer, AccountsTransactionSerializer, PaymentsTransactionSerializer, AdminActivitySerializer,
     BackupVerificationSerializer, SessionSerializer, PasswordResetTokenSerializer,
     AuthLogSerializer, PaymentSerializer, PaymentLogSerializer, ProductSerializer,
@@ -16,6 +16,7 @@ from .serializers import (
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken, AccessToken
 from rest_framework_simplejwt.authentication import JWTAuthentication
+from rest_framework_simplejwt.views import TokenObtainPairView
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 import logging
@@ -765,6 +766,12 @@ class GoogleOAuthCallbackView(APIView):
         return super().dispatch(*args, **kwargs)
 
     def post(self, request):
+        print("=" * 50)
+        print("Google OAuth Callback - POST received")
+        print(f"Request data: {request.data}")
+        print(f"Client ID configured: {bool(getattr(settings, 'GOOGLE_OAUTH_CLIENT_ID', None))}")
+        print("=" * 50)
+        
         try:
             # Check if Google OAuth is configured
             if not hasattr(settings, 'GOOGLE_OAUTH_CLIENT_ID') or not settings.GOOGLE_OAUTH_CLIENT_ID:
@@ -774,34 +781,57 @@ class GoogleOAuthCallbackView(APIView):
                 )
 
             code = request.data.get('code')
-            state = request.data.get('state')
             if not code:
                 raise ValueError('Authorization code is required')
 
-            # Validate state parameter for security
-            session_state = request.session.get('oauth_state')
-            if state and session_state and state != session_state:
-                raise ValueError('Invalid OAuth state')
+            # Get redirect_uri from request or use default
+            # This must match the redirect_uri used in the frontend OAuth initiation
+            redirect_uri = request.data.get('redirect_uri', 'http://localhost:3000/auth/callback/google')
 
-            # Get the redirect URI from the session or use default
-            redirect_uri = request.session.get('oauth_redirect_uri', 'http://localhost:3000/auth/callback/google')
-
-            # Exchange code for tokens and get user info
-            from .oauth import GoogleOAuth, OAuthService
-            google_oauth = GoogleOAuth()
-
-            # Create OAuth session with the same redirect URI used during authorization
-            oauth_session = google_oauth.get_oauth_session(redirect_uri)
+            # Exchange code for tokens using direct HTTP request (more reliable)
+            import requests as http_requests
             token_url = 'https://oauth2.googleapis.com/token'
-
-            token_response = oauth_session.fetch_token(
-                token_url=token_url,
-                code=code,
-                client_secret=settings.GOOGLE_OAUTH_CLIENT_SECRET
+            
+            token_data = {
+                'code': code,
+                'client_id': settings.GOOGLE_OAUTH_CLIENT_ID,
+                'client_secret': settings.GOOGLE_OAUTH_CLIENT_SECRET,
+                'redirect_uri': redirect_uri,
+                'grant_type': 'authorization_code'
+            }
+            
+            token_response = http_requests.post(token_url, data=token_data)
+            
+            if token_response.status_code != 200:
+                error_data = token_response.json()
+                raise ValueError(f"Token exchange failed: {error_data.get('error_description', error_data.get('error', 'Unknown error'))}")
+            
+            google_tokens = token_response.json()
+            access_token = google_tokens.get('access_token')
+            
+            # Get user info from Google
+            userinfo_url = 'https://www.googleapis.com/oauth2/v3/userinfo'
+            userinfo_response = http_requests.get(
+                userinfo_url,
+                headers={'Authorization': f'Bearer {access_token}'}
             )
-
-            # Get user info
-            user_info = google_oauth.get_user_info(token_response)
+            
+            if userinfo_response.status_code != 200:
+                raise ValueError('Failed to get user info from Google')
+            
+            google_user = userinfo_response.json()
+            
+            user_info = {
+                'email': google_user['email'],
+                'first_name': google_user.get('given_name', ''),
+                'last_name': google_user.get('family_name', '')
+            }
+            
+            if not google_user.get('email_verified'):
+                raise ValueError('Google email not verified')
+            
+            # Authenticate or create user
+            from .oauth import OAuthService
 
             # Authenticate or create user
             user = OAuthService.authenticate_or_create(user_info, 'google')
@@ -822,9 +852,13 @@ class GoogleOAuthCallbackView(APIView):
             }, status=status.HTTP_200_OK)
 
         except Exception as e:
+            import traceback
             logger.error(f"Google OAuth callback failed: {str(e)}")
+            logger.error(f"Full traceback: {traceback.format_exc()}")
+            print(f"Google OAuth callback error: {str(e)}")
+            print(f"Full traceback: {traceback.format_exc()}")
             return Response(
-                {'error': str(e)},
+                {'error': str(e), 'details': traceback.format_exc()},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -991,7 +1025,6 @@ class CustomerStatsView(APIView):
         try:
             from datetime import timedelta
             from django.utils import timezone
-            from payments.models import Transaction as PaymentTransaction
             from django.db.models import Q
             
             # Get customer profile
@@ -1000,9 +1033,9 @@ class CustomerStatsView(APIView):
             # Get transactions for this month
             thirty_days_ago = timezone.now() - timedelta(days=30)
             
-            # Query payments Transaction model (has customer field)
+            # Query payments Payment model (has customer field)
             if customer:
-                all_transactions = PaymentTransaction.objects.filter(customer=customer)
+                all_transactions = Payment.objects.filter(customer=customer)
             else:
                 # Fallback: use accounts Transaction model with sender field
                 all_transactions = Transaction.objects.filter(
@@ -2034,3 +2067,6 @@ class UserSearchView(APIView):
             'results': results,
             'count': len(results)
         })
+
+class MyTokenObtainPairView(TokenObtainPairView):
+    serializer_class = MyTokenObtainPairSerializer

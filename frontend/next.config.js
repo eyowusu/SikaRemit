@@ -2,10 +2,12 @@ const withBundleAnalyzer = require('@next/bundle-analyzer')({
   enabled: process.env.ANALYZE === 'true',
 });
 
+const isExport = process.env.NODE_ENV === 'production';
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Production optimizations
-  output: 'export',
+  // Production optimizations - only use export for production builds
+  ...(isExport && { output: 'export' }),
   poweredByHeader: false,
   compress: true,
   trailingSlash: true,
@@ -16,58 +18,34 @@ const nextConfig = {
     missingSuspenseCSSToken: true,
   },
   
-  // Remove rewrites for production - use direct API calls
-  async rewrites() {
-    // Only add rewrites in development
-    if (process.env.NODE_ENV === 'development') {
+  // Rewrites only in development (not compatible with static export)
+  ...(!isExport && {
+    async rewrites() {
       return [
         {
           source: '/api/django/:path*',
           destination: 'http://localhost:8000/api/:path*',
         },
       ];
-    }
-    return [];
-  },
-  
-  // Security headers
-  async headers() {
-    return [
-      {
-        source: '/:path*',
-        headers: [
-          {
-            key: 'X-DNS-Prefetch-Control',
-            value: 'on',
-          },
-          {
-            key: 'Strict-Transport-Security',
-            value: 'max-age=63072000; includeSubDomains; preload',
-          },
-          {
-            key: 'X-Content-Type-Options',
-            value: 'nosniff',
-          },
-          {
-            key: 'X-Frame-Options',
-            value: 'DENY',
-          },
-          {
-            key: 'X-XSS-Protection',
-            value: '1; mode=block',
-          },
-          {
-            key: 'Referrer-Policy',
-            value: 'strict-origin-when-cross-origin',
-          },
-          {
-            key: 'Permissions-Policy',
-            value: 'camera=(), microphone=(), geolocation=(self)',
-          },
-        ],
-      },
-    ];
-  },
+    },
+    // Security headers (only in dev, use hosting provider headers in production)
+    async headers() {
+      return [
+        {
+          source: '/:path*',
+          headers: [
+            { key: 'X-DNS-Prefetch-Control', value: 'on' },
+            { key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains; preload' },
+            { key: 'X-Content-Type-Options', value: 'nosniff' },
+            { key: 'X-Frame-Options', value: 'DENY' },
+            { key: 'X-XSS-Protection', value: '1; mode=block' },
+            { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+            { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=(self)' },
+          ],
+        },
+      ];
+    },
+  }),
   
   env: {
     NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,

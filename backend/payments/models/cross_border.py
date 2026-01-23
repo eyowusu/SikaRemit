@@ -25,7 +25,7 @@ class CrossBorderRemittance(models.Model):
     ]
     
     # Sender Information (KYC Compliance Fields)
-    sender = models.ForeignKey('users.Customer', on_delete=models.PROTECT, related_name='sent_remittances')
+    sender = models.ForeignKey('users.Customer', on_delete=models.SET_NULL, null=True, related_name='sent_remittances')
     sender_id_type = models.CharField(max_length=50, blank=True, help_text="Type of ID used for verification (e.g. Passport, Driver's License)")
     sender_id_number = models.CharField(max_length=50, blank=True, help_text="ID number used for verification")
     sender_id_issuing_authority = models.CharField(max_length=100, blank=True, help_text="Issuing authority for sender's ID")

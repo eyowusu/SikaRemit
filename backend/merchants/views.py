@@ -452,8 +452,7 @@ class MerchantDashboardViewSet(viewsets.ViewSet):
     """Provides merchant business analytics"""
     permission_classes = [permissions.IsAuthenticated, IsMerchantUser]
     
-    @action(detail=False, methods=['get'])
-    def summary(self, request):
+    def list(self, request):
         """Get merchant business summary"""
         merchant = request.user.merchant_profile
         

@@ -9,7 +9,7 @@ export default function RevenueChart() {
     queryKey: ['merchant-revenue-trend'],
     queryFn: async () => {
       try {
-        const response = await api.get('/api/merchants/dashboard/sales_trend/')
+        const response = await api.get('/api/v1/merchants/dashboard/sales_trend/')
         return response.data
       } catch (error) {
         // Mock data for demo

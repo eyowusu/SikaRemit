@@ -15,7 +15,7 @@ class Transaction(models.Model):
         (REFUNDED, 'Refunded'),
     ]
     
-    customer = models.ForeignKey(Customer, on_delete=models.PROTECT)
+    customer = models.ForeignKey(Customer, on_delete=models.SET_NULL, null=True)
     merchant = models.ForeignKey(Merchant, on_delete=models.PROTECT, null=True, blank=True)
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     currency = models.CharField(max_length=3, default='USD')

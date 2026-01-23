@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { googleOAuthCallback } from '@/lib/api/auth'
 import { useToast } from '@/hooks/use-toast'
@@ -13,9 +13,14 @@ export function GoogleCallbackContent() {
   const [isProcessing, setIsProcessing] = useState(true)
   const [status, setStatus] = useState(null)
   const [message, setMessage] = useState(null)
+  const hasProcessed = useRef(false)
 
   useEffect(() => {
     const handleCallback = async () => {
+      // Prevent multiple calls (React Strict Mode, etc.)
+      if (hasProcessed.current) return
+      hasProcessed.current = true
+      
       try {
         const code = searchParams.get('code')
         const error = searchParams.get('error')
@@ -28,6 +33,8 @@ export function GoogleCallbackContent() {
           throw new Error('No authorization code received')
         }
 
+        console.log('Exchanging Google OAuth code for tokens...')
+        
         // Exchange the code for tokens using the API function
         const tokens = await googleOAuthCallback(code)
         localStorage.setItem('access_token', tokens.access)

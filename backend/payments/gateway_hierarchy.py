@@ -203,12 +203,14 @@ class GatewayHierarchyRegistry:
                 self._active_gateways[gateway_name] = config
                 logger.info(f"Gateway '{gateway_name}' activated")
             else:
-                logger.warning(f"Gateway '{gateway_name}' disabled - missing configuration")
+                logger.info(f"Gateway '{gateway_name}' disabled - missing configuration")
 
     def _check_gateway_config(self, config: GatewayConfig) -> bool:
         """Check if gateway has all required configuration"""
         for env_var in config.requires_config:
-            if not getattr(settings, env_var, None):
+            # Check for both missing attribute and empty string value
+            value = getattr(settings, env_var, None)
+            if value is None or value == '':
                 return False
         return True
 

@@ -156,9 +156,9 @@ export default function WithdrawPage() {
     <div className="max-w-2xl mx-auto space-y-6">
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="sm" asChild>
-          <Link href="/customer/payments" className="flex items-center gap-2">
+          <Link href="/customer/dashboard" className="flex items-center gap-2">
             <ArrowLeft className="h-4 w-4" />
-            Back to Payments
+            Back to Dashboard
           </Link>
         </Button>
       </div>

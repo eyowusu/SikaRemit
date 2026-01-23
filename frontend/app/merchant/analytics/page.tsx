@@ -233,7 +233,9 @@ export default function MerchantAnalyticsPage() {
               </div>
             </CardHeader>
             <CardContent className="relative z-10 p-6">
-              <RevenueChart />
+              <div className="h-80 w-full">
+                <RevenueChart />
+              </div>
             </CardContent>
           </Card>
 
@@ -253,7 +255,9 @@ export default function MerchantAnalyticsPage() {
               </div>
             </CardHeader>
             <CardContent className="relative z-10 p-6">
-              <SalesChart />
+              <div className="h-80 w-full">
+                <SalesChart />
+              </div>
             </CardContent>
           </Card>
         </div>

@@ -5,7 +5,7 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     UserLoginView, UserRegisterView, UserLogoutView, PasswordResetView,
     PasswordResetConfirmView, EmailVerificationView, EmailVerificationConfirmView,
-    MFASetupView, MFALoginView, MFABackupCodesView, GoogleOAuthCallbackView,
+    MFASetupView, MFALoginView, MFABackupCodesView, GoogleAuthView, GoogleOAuthCallbackView,
     PasswordChangeView, ProfileView, CustomerViewSet, CustomerStatsView,
     AdminUserCreateView, AdminUserViewSet, SupportTicketViewSet, PayoutViewSet, UserSearchView
 )
@@ -33,6 +33,7 @@ urlpatterns = [
     path('2fa/setup/', MFASetupView.as_view(), name='mfa_setup'),
     path('mfa/verify/', MFALoginView.as_view(), name='mfa_verify'),
     path('mfa/backup-codes/', MFABackupCodesView.as_view(), name='mfa_backup_codes'),
+    path('google/', GoogleAuthView.as_view(), name='google_auth'),
     path('google/callback/', GoogleOAuthCallbackView.as_view(), name='google_callback'),
     path('customers/balance/', CustomerViewSet.as_view({'get': 'balance'}), name='customer_balance'),
     path('customers/payments/', CustomerViewSet.as_view({'get': 'payments'}), name='customer_payments'),

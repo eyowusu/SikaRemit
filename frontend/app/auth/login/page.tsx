@@ -8,9 +8,30 @@ import { ArrowLeft, Globe, Shield, Lock } from 'lucide-react'
 export default function LoginPage() {
   const handleGoogleLogin = async () => {
     try {
-      // Redirect to backend Google OAuth endpoint with callback URL
-      const frontendUrl = window.location.origin
-      window.location.href = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/v1/accounts/google/?callback_url=${encodeURIComponent(frontendUrl)}`
+      // Direct frontend-initiated Google OAuth
+      const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID
+      const redirectUri = `${window.location.origin}/auth/callback/google`
+      const scope = 'openid email profile'
+      
+      // Debug: Log the client ID being used
+      console.log('Google OAuth Client ID:', clientId)
+      console.log('Redirect URI:', redirectUri)
+      
+      if (!clientId) {
+        alert('Google OAuth Client ID is not configured. Please check your environment variables.')
+        return
+      }
+      
+      const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
+        `client_id=${clientId}&` +
+        `redirect_uri=${encodeURIComponent(redirectUri)}&` +
+        `response_type=code&` +
+        `scope=${encodeURIComponent(scope)}&` +
+        `access_type=offline&` +
+        `prompt=consent`
+      
+      console.log('Auth URL:', authUrl)
+      window.location.href = authUrl
     } catch (error) {
       console.error('Google sign in failed:', error)
       alert('Failed to initiate Google sign-in. Please try again.')

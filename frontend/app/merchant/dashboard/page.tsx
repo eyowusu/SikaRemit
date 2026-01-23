@@ -169,9 +169,9 @@ export default function MerchantDashboard() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
             {QUICK_ACTIONS.map((action, index) => (
-              <Link key={action.title} href={action.href}>
-                <Card className="bg-sikaremit-card/80 backdrop-blur-sm group cursor-pointer border-0 shadow-lg hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 bg-white/40 backdrop-blur-xl border border-white/30 shadow-xl shadow-purple-500/5 hover:shadow-purple-500/10 relative overflow-hidden">
-                  <CardContent className="p-8 relative">
+              <Link key={action.title} href={action.href} className="flex">
+                <Card className="w-full bg-sikaremit-card/80 backdrop-blur-sm group cursor-pointer border-0 shadow-lg hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 bg-white/40 backdrop-blur-xl border border-white/30 shadow-xl shadow-purple-500/5 hover:shadow-purple-500/10 relative overflow-hidden flex flex-col">
+                  <CardContent className="p-8 relative flex-grow flex flex-col justify-center">
                     <div className="flex items-center space-x-4">
                       <div className="p-4 rounded-xl bg-gradient-to-br from-purple-600 to-pink-500 shadow-lg group-hover:scale-110 transition-all duration-300 group-hover:rotate-3">
                         <Activity className="h-8 w-8 text-white" />
@@ -215,7 +215,7 @@ export default function MerchantDashboard() {
                 </div>
               </CardHeader>
               <CardContent className="pt-0">
-                <div className="h-80">
+                <div className="h-80 w-full">
                   <RevenueChart />
                 </div>
               </CardContent>
@@ -255,7 +255,7 @@ export default function MerchantDashboard() {
               </div>
             </CardHeader>
             <CardContent className="pt-0">
-              <div className="h-80">
+              <div className="h-80 w-full">
                 <SalesChart />
               </div>
             </CardContent>

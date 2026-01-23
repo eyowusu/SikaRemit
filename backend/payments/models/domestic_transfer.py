@@ -21,7 +21,7 @@ class DomesticTransfer(models.Model):
         (CANCELLED, 'Cancelled'),
     ]
 
-    sender = models.ForeignKey(Customer, on_delete=models.PROTECT, related_name='sent_domestic_transfers')
+    sender = models.ForeignKey(Customer, on_delete=models.SET_NULL, null=True, related_name='sent_domestic_transfers')
     recipient = models.ForeignKey(Recipient, on_delete=models.PROTECT, related_name='received_domestic_transfers')
     amount = models.DecimalField(max_digits=12, decimal_places=2)
     currency = models.CharField(max_length=3, default='GHS')

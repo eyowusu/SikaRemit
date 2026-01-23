@@ -186,8 +186,12 @@ export async function verifyTwoFactor(code: string) {
 }
 
 export async function googleOAuthCallback(code: string) {
+  // Must send the same redirect_uri that was used in the OAuth initiation
+  const redirectUri = `${window.location.origin}/auth/callback/google`
+  
   const response = await axios.post(`${API_BASE_URL}/api/v1/accounts/google/callback/`, {
-    code
+    code,
+    redirect_uri: redirectUri
   })
 
   if (response.status === 503) {
