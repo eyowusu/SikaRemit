@@ -61,18 +61,24 @@ export default function Home() {
   return (
     <TooltipProvider>
       <div className="min-h-screen bg-white">
-          {/* Navigation - Revolut Style */}
-          <nav className={`revolut-nav transition-all duration-300 ${scrolled ? 'py-2 shadow-lg' : 'py-4'} ${isVisible ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0'}`}>
-            <div className="revolut-container">
-              <div className="flex items-center justify-between h-14 sm:h-16">
+          {/* Navigation */}
+          <nav style={{ 
+            position: 'sticky', 
+            top: 0, 
+            zIndex: 100, 
+            backgroundColor: '#ffffff', 
+            borderBottom: '1px solid #e5e7eb',
+            padding: scrolled ? '8px 0' : '16px 0',
+            boxShadow: scrolled ? '0 4px 6px -1px rgba(0, 0, 0, 0.1)' : 'none'
+          }}>
+            <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '0 16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '48px' }}>
                 {/* Logo */}
-                <Link href="/" className="flex items-center gap-2 sm:gap-3 group">
-                  <div className="relative flex-shrink-0">
-                    <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg group-hover:shadow-xl transition-all duration-300 group-hover:scale-105 overflow-hidden">
-                      <img src="/logos/SikaRemit.jpeg" alt="SikaRemit" className="w-6 h-6 sm:w-8 sm:h-8 object-cover rounded-lg" />
-                    </div>
+                <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: '8px', textDecoration: 'none' }}>
+                  <div style={{ width: '36px', height: '36px', background: 'linear-gradient(to bottom right, #3b82f6, #2563eb)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0 }}>
+                    <img src="/logos/SikaRemit.jpeg" alt="SikaRemit" style={{ width: '28px', height: '28px', objectFit: 'cover', borderRadius: '6px' }} />
                   </div>
-                  <span className="text-lg sm:text-xl font-bold text-gray-900 whitespace-nowrap">
+                  <span style={{ fontSize: '18px', fontWeight: 'bold', color: '#111827', whiteSpace: 'nowrap', position: 'relative', zIndex: 10 }}>
                     SikaRemit
                   </span>
                 </Link>
@@ -107,36 +113,6 @@ export default function Home() {
                 </HoverCard>
               </div>
 
-              {/* Mobile Navigation */}
-              <div className={`lg:hidden absolute top-16 left-0 right-0 bg-white border-b border-gray-200 overflow-hidden transition-all duration-300 ${mobileMenuOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'}`}>
-                <div className="p-4 space-y-2">
-                  <Link href="#features" className="block px-4 py-3 text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-xl transition-all duration-200">
-                    Features
-                  </Link>
-                  <Link href="#pricing" className="block px-4 py-3 text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-xl transition-all duration-200">
-                    Pricing
-                  </Link>
-                  <Link href="#about" className="block px-4 py-3 text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-xl transition-all duration-200">
-                    About
-                  </Link>
-                  <Link href="/contact" className="block px-4 py-3 text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-xl transition-all duration-200">
-                    Contact
-                  </Link>
-                  <div className="flex flex-col space-y-2 pt-4 border-t border-gray-200">
-                    <Link href="/auth/login">
-                      <Button variant="ghost" className="w-full justify-center text-gray-700">
-                        Sign In
-                      </Button>
-                    </Link>
-                    <Link href="/auth">
-                      <Button className="w-full bg-blue-600 hover:bg-blue-700">
-                        Get Started
-                      </Button>
-                    </Link>
-                  </div>
-                </div>
-              </div>
-
               {/* Auth Buttons */}
               <div className="hidden lg:flex items-center space-x-4">
                 <Link href="/auth/login">
@@ -154,14 +130,35 @@ export default function Home() {
 
               {/* Mobile Menu Button */}
               <button
-                className="lg:hidden p-2 rounded-xl hover:bg-accent transition-colors duration-200"
+                style={{ display: 'block', padding: '8px', borderRadius: '8px', border: 'none', background: 'transparent', cursor: 'pointer' }}
+                className="lg:hidden"
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               >
-                {mobileMenuOpen ? <X className="w-6 h-6 text-foreground" /> : <Menu className="w-6 h-6 text-foreground" />}
+                {mobileMenuOpen ? <X style={{ width: '24px', height: '24px', color: '#374151' }} /> : <Menu style={{ width: '24px', height: '24px', color: '#374151' }} />}
               </button>
             </div>
           </div>
         </nav>
+
+        {/* Mobile Menu Dropdown */}
+        {mobileMenuOpen && (
+          <div className="lg:hidden" style={{ position: 'fixed', top: '80px', left: 0, right: 0, backgroundColor: '#ffffff', borderBottom: '1px solid #e5e7eb', zIndex: 99, padding: '16px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <Link href="#features" style={{ padding: '12px 16px', color: '#4b5563', textDecoration: 'none', borderRadius: '8px' }}>Features</Link>
+              <Link href="#pricing" style={{ padding: '12px 16px', color: '#4b5563', textDecoration: 'none', borderRadius: '8px' }}>Pricing</Link>
+              <Link href="#about" style={{ padding: '12px 16px', color: '#4b5563', textDecoration: 'none', borderRadius: '8px' }}>About</Link>
+              <Link href="/contact" style={{ padding: '12px 16px', color: '#4b5563', textDecoration: 'none', borderRadius: '8px' }}>Contact</Link>
+              <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: '16px', marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <Link href="/auth/login">
+                  <Button variant="ghost" className="w-full justify-center">Sign In</Button>
+                </Link>
+                <Link href="/auth">
+                  <Button className="w-full bg-blue-600 hover:bg-blue-700">Get Started</Button>
+                </Link>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Hero Section - Revolut Style */}
         <section className="relative overflow-hidden bg-gradient-to-br from-blue-50 via-white to-purple-50">
