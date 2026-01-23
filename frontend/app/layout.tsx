@@ -61,72 +61,81 @@ export default function RootLayout({
 
             <footer className="border-t border-gray-200 bg-gray-50 relative z-10">
               <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
-                <div className="grid gap-6 sm:gap-8 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-                  <div className="sm:col-span-2 lg:col-span-2">
-                    <div className="flex items-center space-x-3 mb-4 group">
-                      <div className="w-10 h-10 bg-gradient-to-r from-purple-600 via-purple-500 to-pink-500 rounded-xl flex items-center justify-center shadow-xl group-hover:shadow-2xl group-hover:scale-110 transition-all duration-300 overflow-hidden">
-                        <img src="/logos/SikaRemit.jpeg" alt="SikaRemit" className="w-8 h-8 object-cover rounded-lg" />
-                      </div>
-                      <div>
-                        <span className="text-xl font-bold bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-transparent">SikaRemit</span>
-                        <div className="text-sm text-muted-foreground">Secure Payment Solutions</div>
-                      </div>
+                {/* Logo Section */}
+                <div className="mb-6">
+                  <div className="flex items-center space-x-3 mb-4">
+                    <div className="w-10 h-10 bg-gradient-to-r from-purple-600 via-purple-500 to-pink-500 rounded-xl flex items-center justify-center shadow-xl overflow-hidden">
+                      <img src="/logos/SikaRemit.jpeg" alt="SikaRemit" className="w-8 h-8 object-cover rounded-lg" />
                     </div>
-                    <p className="text-muted-foreground mb-6 max-w-md leading-relaxed">
-                      Empowering businesses worldwide with secure, fast, and reliable payment processing solutions.
-                      Built for the future of digital commerce.
-                    </p>
-                    <div className="flex space-x-4">
-                      <Button variant="ghost" size="sm" className="h-9 w-9 p-0 hover:bg-white/50 hover:scale-110 transition-all duration-300 hover:shadow-lg hover:shadow-purple-500/20">
-                        <Globe className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="sm" className="h-9 w-9 p-0 hover:bg-white/50 hover:scale-110 transition-all duration-300 hover:shadow-lg hover:shadow-purple-500/20">
-                        <CreditCard className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="sm" className="h-9 w-9 p-0 hover:bg-white/50 hover:scale-110 transition-all duration-300 hover:shadow-lg hover:shadow-purple-500/20">
-                        <Shield className="h-4 w-4" />
-                      </Button>
+                    <div>
+                      <span className="text-xl font-bold bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-transparent">SikaRemit</span>
+                      <div className="text-sm text-muted-foreground">Secure Payment Solutions</div>
                     </div>
                   </div>
+                  <p className="text-muted-foreground text-sm mb-4 max-w-md leading-relaxed">
+                    Empowering businesses worldwide with secure, fast, and reliable payment processing solutions.
+                  </p>
+                  <div className="flex space-x-3">
+                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                      <Globe className="h-4 w-4" />
+                    </Button>
+                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                      <CreditCard className="h-4 w-4" />
+                    </Button>
+                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                      <Shield className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
 
+                {/* Links Grid */}
+                <div className="grid grid-cols-2 gap-6 sm:grid-cols-4 mb-6">
                   <div>
-                    <h3 className="font-semibold text-foreground mb-4">Product</h3>
-                    <ul className="space-y-2 text-muted-foreground">
-                      <li><Link href="#features" className="hover:text-sikaremit-primary transition-all duration-300 hover:scale-105 relative group">Features<span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-sikaremit-primary to-pink-500 group-hover:w-full transition-all duration-300"></span></Link></li>
-                      <li><Link href="#pricing" className="hover:text-sikaremit-primary transition-all duration-300 hover:scale-105 relative group">Pricing<span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-sikaremit-primary to-pink-500 group-hover:w-full transition-all duration-300"></span></Link></li>
-                      <li><Link href="#security" className="hover:text-sikaremit-primary transition-all duration-300 hover:scale-105 relative group">Security<span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-sikaremit-primary to-pink-500 group-hover:w-full transition-all duration-300"></span></Link></li>
-                      <li><Link href="/api" className="hover:text-sikaremit-primary transition-all duration-300 hover:scale-105 relative group">API Docs<span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-sikaremit-primary to-pink-500 group-hover:w-full transition-all duration-300"></span></Link></li>
+                    <h3 className="font-semibold text-foreground text-sm mb-3">Product</h3>
+                    <ul className="space-y-2 text-sm text-muted-foreground">
+                      <li><Link href="#features" className="hover:text-sikaremit-primary">Features</Link></li>
+                      <li><Link href="#pricing" className="hover:text-sikaremit-primary">Pricing</Link></li>
+                      <li><Link href="#security" className="hover:text-sikaremit-primary">Security</Link></li>
+                      <li><Link href="/api" className="hover:text-sikaremit-primary">API Docs</Link></li>
                     </ul>
                   </div>
 
                   <div>
-                    <h3 className="font-semibold text-foreground mb-4">Support</h3>
-                    <ul className="space-y-2 text-muted-foreground">
-                      <li><Link href="/faq" className="hover:text-sikaremit-primary transition-all duration-300 hover:scale-105 relative group">FAQ<span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-sikaremit-primary to-pink-500 group-hover:w-full transition-all duration-300"></span></Link></li>
-                      <li><Link href="/contact" className="hover:text-sikaremit-primary transition-all duration-300 hover:scale-105 relative group">Contact<span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-sikaremit-primary to-pink-500 group-hover:w-full transition-all duration-300"></span></Link></li>
-                      <li><Link href="/help" className="hover:text-sikaremit-primary transition-all duration-300 hover:scale-105 relative group">Help Center<span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-sikaremit-primary to-pink-500 group-hover:w-full transition-all duration-300"></span></Link></li>
-                      <li><Link href="/status" className="hover:text-sikaremit-primary transition-all duration-300 hover:scale-105 relative group">System Status<span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-sikaremit-primary to-pink-500 group-hover:w-full transition-all duration-300"></span></Link></li>
+                    <h3 className="font-semibold text-foreground text-sm mb-3">Support</h3>
+                    <ul className="space-y-2 text-sm text-muted-foreground">
+                      <li><Link href="/faq" className="hover:text-sikaremit-primary">FAQ</Link></li>
+                      <li><Link href="/contact" className="hover:text-sikaremit-primary">Contact</Link></li>
+                      <li><Link href="/help" className="hover:text-sikaremit-primary">Help Center</Link></li>
+                      <li><Link href="/status" className="hover:text-sikaremit-primary">Status</Link></li>
+                    </ul>
+                  </div>
+
+                  <div>
+                    <h3 className="font-semibold text-foreground text-sm mb-3">Company</h3>
+                    <ul className="space-y-2 text-sm text-muted-foreground">
+                      <li><Link href="/about" className="hover:text-sikaremit-primary">About</Link></li>
+                      <li><Link href="/careers" className="hover:text-sikaremit-primary">Careers</Link></li>
+                      <li><Link href="/blog" className="hover:text-sikaremit-primary">Blog</Link></li>
+                      <li><Link href="/press" className="hover:text-sikaremit-primary">Press</Link></li>
+                    </ul>
+                  </div>
+
+                  <div>
+                    <h3 className="font-semibold text-foreground text-sm mb-3">Legal</h3>
+                    <ul className="space-y-2 text-sm text-muted-foreground">
+                      <li><Link href="/privacy" className="hover:text-sikaremit-primary">Privacy</Link></li>
+                      <li><Link href="/terms" className="hover:text-sikaremit-primary">Terms</Link></li>
+                      <li><Link href="/compliance" className="hover:text-sikaremit-primary">Compliance</Link></li>
+                      <li><Link href="/cookies" className="hover:text-sikaremit-primary">Cookies</Link></li>
                     </ul>
                   </div>
                 </div>
 
-                <Separator className="my-6 sm:my-8 bg-gray-200" />
+                <Separator className="mb-6 bg-gray-200" />
 
-                <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-center md:text-left">
-                  <div className="flex flex-col md:flex-row md:items-center space-y-2 md:space-y-0 md:space-x-4">
-                    <p className="text-muted-foreground text-sm">
-                      © 2025 SikaRemit. All rights reserved.
-                    </p>
-                    <p className="text-muted-foreground text-sm">
-                      Powered by PayGlobe
-                    </p>
-                  </div>
-                  <div className="flex flex-wrap gap-3 sm:gap-6 text-xs sm:text-sm text-muted-foreground justify-center md:justify-start">
-                    <Link href="/privacy" className="hover:text-sikaremit-primary transition-all duration-300 hover:scale-105 relative group">Privacy Policy<span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-sikaremit-primary to-pink-500 group-hover:w-full transition-all duration-300"></span></Link>
-                    <Link href="/terms" className="hover:text-sikaremit-primary transition-all duration-300 hover:scale-105 relative group">Terms of Service<span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-sikaremit-primary to-pink-500 group-hover:w-full transition-all duration-300"></span></Link>
-                    <Link href="/compliance" className="hover:text-sikaremit-primary transition-all duration-300 hover:scale-105 relative group">Compliance<span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-sikaremit-primary to-pink-500 group-hover:w-full transition-all duration-300"></span></Link>
-                    <Link href="/cookies" className="hover:text-sikaremit-primary transition-all duration-300 hover:scale-105 relative group">Cookie Policy<span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-sikaremit-primary to-pink-500 group-hover:w-full transition-all duration-300"></span></Link>
-                  </div>
+                {/* Copyright */}
+                <div className="text-center text-xs sm:text-sm text-muted-foreground">
+                  <p>© 2025 SikaRemit. All rights reserved. Powered by PayGlobe</p>
                 </div>
               </div>
             </footer>
