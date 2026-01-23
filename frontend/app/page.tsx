@@ -64,19 +64,19 @@ export default function Home() {
           {/* Navigation - Revolut Style */}
           <nav className={`revolut-nav transition-all duration-300 ${scrolled ? 'py-2 shadow-lg' : 'py-4'} ${isVisible ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0'}`}>
             <div className="revolut-container">
-              <div className="flex items-center justify-between h-16">
+              <div className="flex items-center justify-between h-14 sm:h-16">
                 {/* Logo */}
                 <Link href="/" className="flex items-center space-x-3 group">
                   <div className="relative">
-                    <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg group-hover:shadow-xl transition-all duration-300 group-hover:scale-105 overflow-hidden">
-                      <img src="/logos/SikaRemit.jpeg" alt="SikaRemit" className="w-8 h-8 object-cover rounded-lg" />
+                    <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg group-hover:shadow-xl transition-all duration-300 group-hover:scale-105 overflow-hidden">
+                      <img src="/logos/SikaRemit.jpeg" alt="SikaRemit" className="w-6 h-6 sm:w-8 sm:h-8 object-cover rounded-lg" />
                     </div>
                   </div>
                   <div>
-                    <span className="text-xl font-bold text-gray-900">
+                    <span className="text-lg sm:text-xl font-bold text-gray-900">
                       SikaRemit
                     </span>
-                    <div className="text-xs text-gray-500 -mt-0.5">Financial Technology</div>
+                    <div className="text-xs text-gray-500 -mt-0.5 hidden sm:block">Financial Technology</div>
                   </div>
                 </Link>
 
@@ -126,7 +126,7 @@ export default function Home() {
                     Contact
                   </Link>
                   <div className="flex flex-col space-y-2 pt-4 border-t border-gray-200">
-                    <Link href="/auth">
+                    <Link href="/auth/login">
                       <Button variant="ghost" className="w-full justify-center text-gray-700">
                         Sign In
                       </Button>
@@ -142,7 +142,7 @@ export default function Home() {
 
               {/* Auth Buttons */}
               <div className="hidden lg:flex items-center space-x-4">
-                <Link href="/auth">
+                <Link href="/auth/login">
                   <Button variant="ghost" className="font-medium text-gray-700 hover:text-gray-900">
                     Sign In
                   </Button>
@@ -332,20 +332,20 @@ export default function Home() {
         </section>
 
         {/* Footer */}
-        <footer className="bg-gray-900 text-white py-16">
+        <footer className="bg-gray-900 text-white py-10 sm:py-16">
           <div className="revolut-container">
-            <div className="grid md:grid-cols-4 gap-8 mb-12">
-              <div className="md:col-span-2">
-                <div className="flex items-center space-x-3 mb-6">
-                  <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
-                    <Globe className="w-6 h-6 text-white" />
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8 mb-8 sm:mb-12">
+              <div className="col-span-2 md:col-span-2">
+                <div className="flex items-center space-x-3 mb-4 sm:mb-6">
+                  <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
+                    <Globe className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
                   </div>
                   <div>
-                    <span className="text-2xl font-bold text-white">SikaRemit</span>
-                    <div className="text-sm text-gray-400">Financial Technology Solutions</div>
+                    <span className="text-xl sm:text-2xl font-bold text-white">SikaRemit</span>
+                    <div className="text-xs sm:text-sm text-gray-400">Financial Technology</div>
                   </div>
                 </div>
-                <p className="text-gray-400 mb-6 max-w-md leading-relaxed">
+                <p className="text-gray-400 mb-4 sm:mb-6 text-sm sm:text-base leading-relaxed">
                   Empowering businesses worldwide with secure, fast, and reliable payment processing solutions.
                   Built for the future of digital commerce.
                 </p>
@@ -392,7 +392,7 @@ export default function Home() {
                   Powered by PayGlobe
                 </p>
               </div>
-              <div className="flex space-x-6 mt-4 md:mt-0">
+              <div className="flex flex-wrap gap-4 sm:gap-6 mt-4 md:mt-0">
                 <Link href="/privacy" className="text-gray-400 hover:text-white text-sm transition-colors">
                   Privacy Policy
                 </Link>

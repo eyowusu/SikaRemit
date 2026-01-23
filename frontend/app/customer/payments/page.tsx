@@ -45,12 +45,12 @@ export default function PaymentsPage() {
   })
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-4 sm:space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-sikaremit-foreground mb-2">Payment Services</h1>
-          <p className="text-sikaremit-muted">
-            Choose from our comprehensive range of payment solutions organized by type
+          <h1 className="text-xl sm:text-2xl font-bold text-sikaremit-foreground mb-1 sm:mb-2">Payment Services</h1>
+          <p className="text-sikaremit-muted text-sm sm:text-base">
+            Choose from our payment solutions
           </p>
         </div>
         <Button variant="outline" asChild>
@@ -62,7 +62,7 @@ export default function PaymentsPage() {
       </div>
 
       {/* Payment Method Categories Overview */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
         {paymentCategories.map((category, index) => (
           <Card key={index} className="hover:shadow-md transition-shadow">
             <CardHeader className="pb-3">
@@ -91,7 +91,7 @@ export default function PaymentsPage() {
       </div>
 
       {/* Features Grid */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
         <Card className="hover:shadow-md transition-shadow">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-semibold flex items-center gap-2">
@@ -157,7 +157,7 @@ export default function PaymentsPage() {
             <p className="text-sm text-muted-foreground mb-4">
               Start your transaction with our improved payment experience
             </p>
-            <div className="flex gap-3 justify-center">
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
               <Button asChild>
                 <Link href="/customer/payments/domestic">
                   Transfer Money
