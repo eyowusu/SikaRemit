@@ -463,8 +463,8 @@ const PaymentMethodCategories: React.FC<PaymentMethodCategoriesProps> = ({
                         <div className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50">
                           <div className="flex items-center gap-3">
                             <div className="flex gap-1">
-                              <Image src="/logos/cards/visa.svg" alt="Visa" width={32} height={20} className="object-contain" />
-                              <Image src="/logos/cards/mastercard.svg" alt="Mastercard" width={32} height={20} className="object-contain" />
+                              <Image src="/logos/cards/visa.svg" alt="Visa" width={32} height={20} className="object-contain" unoptimized />
+                              <Image src="/logos/cards/mastercard.svg" alt="Mastercard" width={32} height={20} className="object-contain" unoptimized />
                             </div>
                             <span>{getMethodDisplay(method)}</span>
                             {method.is_default && <CheckCircle className="h-4 w-4 text-green-600" />}
@@ -558,6 +558,7 @@ const PaymentMethodCategories: React.FC<PaymentMethodCategoriesProps> = ({
                                   width={32}
                                   height={32}
                                   className="object-contain rounded"
+                                  unoptimized
                                 />
                               )}
                               <span>{getMethodDisplay(method)}</span>
@@ -643,11 +644,7 @@ const PaymentMethodCategories: React.FC<PaymentMethodCategoriesProps> = ({
                           width={32}
                           height={20}
                           className="object-contain"
-                          onError={(e) => {
-                            // Fallback to PNG if SVG doesn't exist
-                            const img = e.target as HTMLImageElement
-                            img.src = `/logos/cards/${detectedCardType}.png`
-                          }}
+                          unoptimized
                         />
                       </div>
                     )}
@@ -756,6 +753,7 @@ const PaymentMethodCategories: React.FC<PaymentMethodCategoriesProps> = ({
                             width={24}
                             height={24}
                             className="object-contain"
+                            unoptimized
                           />
                           {provider.name}
                         </Label>
@@ -781,6 +779,7 @@ const PaymentMethodCategories: React.FC<PaymentMethodCategoriesProps> = ({
                           width={24}
                           height={24}
                           className="object-contain"
+                          unoptimized
                         />
                       </div>
                     )}
