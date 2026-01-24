@@ -1,16 +1,30 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
-import { Settings, Store } from 'lucide-react'
+import { usePathname, useRouter } from 'next/navigation'
+import { Settings, Store, LogOut, User } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/lib/auth/context'
 import { ADMIN_NAVIGATION } from '@/lib/constants/admin-ui'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 
 export default function AdminSidebar() {
   const pathname = usePathname()
-  const { user } = useAuth()
+  const router = useRouter()
+  const { user, logout } = useAuth()
+
+  const handleLogout = async () => {
+    await logout()
+    router.push('/')
+  }
 
   return (
       <aside
@@ -51,22 +65,42 @@ export default function AdminSidebar() {
 
         {/* User section */}
         <div className="p-4 border-t border-border">
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center">
-              <span className="text-sm font-semibold text-primary-foreground">
-                {user?.name?.slice(0, 1).toUpperCase() || 'A'}
-              </span>
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-foreground truncate">{user?.name || 'Admin User'}</p>
-              <p className="text-xs text-muted-foreground truncate">{user?.email || 'admin@sikaremit.com'}</p>
-            </div>
-            <Button asChild variant="ghost" size="icon" className="h-8 w-8">
-              <Link href="/admin/settings">
-                <Settings className="w-4 h-4" />
-              </Link>
-            </Button>
-          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="w-full flex items-center space-x-3 p-2 rounded-lg hover:bg-muted transition-colors">
+                <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center">
+                  <span className="text-sm font-semibold text-primary-foreground">
+                    {user?.name?.slice(0, 1).toUpperCase() || 'A'}
+                  </span>
+                </div>
+                <div className="flex-1 min-w-0 text-left">
+                  <p className="text-sm font-medium text-foreground truncate">{user?.name || 'Admin User'}</p>
+                  <p className="text-xs text-muted-foreground truncate">{user?.email || 'admin@sikaremit.com'}</p>
+                </div>
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" side="top" className="w-56">
+              <DropdownMenuLabel>My Account</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem asChild>
+                <Link href="/admin/profile" className="flex items-center cursor-pointer">
+                  <User className="mr-2 h-4 w-4" />
+                  Profile
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href="/admin/settings" className="flex items-center cursor-pointer">
+                  <Settings className="mr-2 h-4 w-4" />
+                  Settings
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={handleLogout} className="text-red-600 cursor-pointer">
+                <LogOut className="mr-2 h-4 w-4" />
+                Log out
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
     </aside>
