@@ -4,8 +4,8 @@ export const getProviderImage = (providerName: string): string | null => {
   console.log('getProviderImage called with:', providerName, 'normalized:', normalizedName)
   const mappings: Array<{ keys: string[], image: string }> = [
     { keys: ['mtn'], image: '/logos/mtn-momo.png' },
-    { keys: ['airteltigo'], image: '/logos/AirtelTigo Money.jpg' },
-    { keys: ['telecel'], image: '/logos/Telecel cash.jpg' },
+    { keys: ['airteltigo', 'airtel_tigo'], image: '/logos/airteltigo-money.jpg' },
+    { keys: ['telecel'], image: '/logos/telecel-cash.jpg' },
     // Add more mappings as needed
   ]
 

@@ -380,13 +380,15 @@ const PaymentMethodCategories: React.FC<PaymentMethodCategoriesProps> = ({
   }
 
   const getProviderLogo = (provider: string) => {
-    switch (provider) {
+    switch (provider?.toLowerCase()) {
       case 'mtn':
+      case 'mtn_momo':
         return '/logos/mtn-momo.png'
       case 'airtel_tigo':
-        return '/logos/AirtelTigo Money.jpg'
+      case 'airteltigo':
+        return '/logos/airteltigo-money.jpg'
       case 'telecel':
-        return '/logos/Telecel cash.jpg'
+        return '/logos/telecel-cash.jpg'
       default:
         return null
     }
@@ -742,8 +744,8 @@ const PaymentMethodCategories: React.FC<PaymentMethodCategoriesProps> = ({
                   >
                     {[
                       { id: 'mtn_momo', name: 'MTN Mobile Money', logo: '/logos/mtn-momo.png' },
-                      { id: 'airtel_tigo', name: 'AirtelTigo Money', logo: '/logos/AirtelTigo Money.jpg' },
-                      { id: 'telecel', name: 'Telecel Cash', logo: '/logos/Telecel cash.jpg' }
+                      { id: 'airtel_tigo', name: 'AirtelTigo Money', logo: '/logos/airteltigo-money.jpg' },
+                      { id: 'telecel', name: 'Telecel Cash', logo: '/logos/telecel-cash.jpg' }
                     ].map((provider) => (
                       <div key={provider.id} className="flex items-center space-x-2">
                         <RadioGroupItem value={provider.id} id={provider.id} />

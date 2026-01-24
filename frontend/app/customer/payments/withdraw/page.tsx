@@ -22,8 +22,8 @@ import {
 
 const MOBILE_MONEY_PROVIDERS = [
   { id: 'MTN', name: 'MTN Mobile Money', color: 'bg-yellow-500', prefixes: ['024', '054', '055', '059'], logo: '/logos/mtn-momo.png' },
-  { id: 'Telecel', name: 'Telecel Cash', color: 'bg-red-500', prefixes: ['020', '050'], logo: '/logos/Telecel cash.jpg' },
-  { id: 'AirtelTigo', name: 'AirtelTigo Money', color: 'bg-blue-500', prefixes: ['026', '056', '027', '057'], logo: '/logos/AirtelTigo Money.jpg' },
+  { id: 'Telecel', name: 'Telecel Cash', color: 'bg-red-500', prefixes: ['020', '050'], logo: '/logos/telecel-cash.jpg' },
+  { id: 'AirtelTigo', name: 'AirtelTigo Money', color: 'bg-blue-500', prefixes: ['026', '056', '027', '057'], logo: '/logos/airteltigo-money.jpg' },
 ]
 
 export default function WithdrawPage() {
