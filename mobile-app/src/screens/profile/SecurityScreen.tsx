@@ -6,16 +6,38 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
+  Dimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import Animated, { FadeInDown } from 'react-native-reanimated';
+import { LinearGradient } from 'expo-linear-gradient';
+import * as Haptics from 'expo-haptics';
+import Animated, { 
+  FadeInDown, 
+  FadeInUp,
+  FadeInRight,
+  useSharedValue, 
+  useAnimatedStyle, 
+  withSpring,
+  interpolate,
+  Extrapolation,
+} from 'react-native-reanimated';
 import { Button, Card, Input } from '../../components/ui';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuthStore } from '../../store/authStore';
-import { BorderRadius, FontSize, FontWeight, Spacing } from '../../constants/theme';
+import { 
+  BorderRadius, 
+  FontSize, 
+  FontWeight, 
+  Spacing, 
+  Shadow, 
+  AnimationConfig, 
+  ComponentSize 
+} from '../../constants/theme';
 import { authService } from '../../services/authService';
+
+const { width } = Dimensions.get('window');
 
 const SecurityScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
@@ -28,6 +50,9 @@ const SecurityScreen: React.FC = () => {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [twoFactorEnabled, setTwoFactorEnabled] = useState(user?.mfa_enabled || false);
+  const [sessionTimeout, setSessionTimeout] = useState(true);
+  const [loginAlerts, setLoginAlerts] = useState(true);
 
   const handleChangePassword = async () => {
     if (!currentPassword || !newPassword || !confirmPassword) {
@@ -61,147 +86,311 @@ const SecurityScreen: React.FC = () => {
     }
   };
 
+  const handleToggleBiometric = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setBiometricEnabled(!biometricEnabled);
+  };
+
+  const handleToggleTwoFactor = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setTwoFactorEnabled(!twoFactorEnabled);
+  };
+
+  const handleToggleSessionTimeout = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setSessionTimeout(!sessionTimeout);
+  };
+
+  const handleToggleLoginAlerts = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setLoginAlerts(!loginAlerts);
+  };
+
+  const handleSecurityAction = (action: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    switch (action) {
+      case 'view_sessions':
+        Alert.alert('Active Sessions', 'You have 2 active sessions on this device.');
+        break;
+      case 'clear_sessions':
+        Alert.alert('Clear Sessions', 'All other sessions will be logged out.');
+        break;
+      case 'security_log':
+        Alert.alert('Security Log', 'No recent security activity detected.');
+        break;
+      case 'privacy_settings':
+        Alert.alert('Privacy Settings', 'Manage your privacy preferences.');
+        break;
+    }
+  };
+
+  const getPasswordStrength = (password: string) => {
+    if (password.length < 6) return { strength: 'weak', color: colors.error };
+    if (password.length < 8) return { strength: 'fair', color: colors.warning };
+    if (password.length < 12) return { strength: 'good', color: colors.primary };
+    return { strength: 'strong', color: colors.success };
+  };
+
+  const securityFeatures = [
+    {
+      title: 'Account Security',
+      description: 'Your account is protected with email verification and advanced security features',
+      icon: 'shield-checkmark',
+      color: colors.success,
+      status: 'Protected',
+    },
+    {
+      title: 'Biometric Authentication',
+      description: 'Use fingerprint or face ID for quick and secure access',
+      icon: 'finger-print',
+      color: colors.primary,
+      toggle: biometricEnabled,
+      onToggle: handleToggleBiometric,
+    },
+    {
+      title: 'Two-Factor Authentication',
+      description: 'Add an extra layer of security to your account',
+      icon: 'phone-portrait',
+      color: colors.accent,
+      toggle: twoFactorEnabled,
+      onToggle: handleToggleTwoFactor,
+    },
+  ];
+
+  const securityActions = [
+    {
+      title: 'Active Sessions',
+      description: 'Manage and monitor your active login sessions',
+      icon: 'devices',
+      color: colors.textMuted,
+      action: 'view_sessions',
+    },
+    {
+      title: 'Clear All Sessions',
+      description: 'Log out from all devices except this one',
+      icon: 'log-out',
+      color: colors.warning,
+      action: 'clear_sessions',
+    },
+    {
+      title: 'Security Log',
+      description: 'View recent security activity and alerts',
+      icon: 'list',
+      color: colors.textMuted,
+      action: 'security_log',
+    },
+    {
+      title: 'Privacy Settings',
+      description: 'Manage your privacy and data preferences',
+      icon: 'lock-closed',
+      color: colors.textMuted,
+      action: 'privacy_settings',
+    },
+  ];
+
+  const renderSecurityFeature = (feature: any, index: number) => (
+    <Animated.View
+      key={feature.title}
+      entering={FadeInRight.duration(400).delay(index * 100)}
+      style={styles.featureItem}
+    >
+      <Card variant="default" padding="lg" style={styles.featureCard}>
+        <View style={styles.featureHeader}>
+          <View style={[
+            styles.featureIcon,
+            { backgroundColor: feature.color + '20' }
+          ]}>
+            <Ionicons name={feature.icon as any} size={24} color={feature.color} />
+          </View>
+          <View style={styles.featureContent}>
+            <Text style={[styles.featureTitle, { color: colors.text }]}>
+              {feature.title}
+            </Text>
+            <Text style={[styles.featureDescription, { color: colors.textSecondary }]}>
+              {feature.description}
+            </Text>
+          </View>
+          {feature.toggle !== undefined && (
+            <TouchableOpacity
+              style={[
+                styles.toggleButton,
+                { backgroundColor: feature.toggle ? feature.color : colors.surface }
+              ]}
+              onPress={feature.onToggle}
+            >
+              <View style={[
+                styles.toggleThumb,
+                { backgroundColor: feature.toggle ? '#FFFFFF' : colors.textMuted }
+              ]} />
+            </TouchableOpacity>
+          )}
+        </View>
+        {feature.status && (
+          <View style={[
+            styles.statusBadge,
+            { backgroundColor: feature.color + '15' }
+          ]}>
+            <Text style={[styles.statusText, { color: feature.color }]}>
+              {feature.status}
+            </Text>
+          </View>
+        )}
+      </Card>
+    </Animated.View>
+  );
+
+  const renderSecurityAction = (action: any, index: number) => (
+    <Animated.View
+      key={action.title}
+      entering={FadeInRight.duration(400).delay(index * 100)}
+      style={styles.actionItem}
+    >
+      <TouchableOpacity
+        style={styles.actionTouchable}
+        onPress={() => handleSecurityAction(action.action)}
+      >
+        <View style={[
+          styles.actionIcon,
+          { backgroundColor: action.color + '20' }
+        ]}>
+          <Ionicons name={action.icon as any} size={20} color={action.color} />
+        </View>
+        <View style={styles.actionContent}>
+          <Text style={[styles.actionTitle, { color: colors.text }]}>
+            {action.title}
+          </Text>
+          <Text style={[styles.actionDescription, { color: colors.textSecondary }]}>
+            {action.description}
+          </Text>
+        </View>
+        <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
+      </TouchableOpacity>
+    </Animated.View>
+  );
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={[styles.header, { paddingTop: insets.top + Spacing.md }]}>
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={24} color={colors.text} />
-        </TouchableOpacity>
-        <Text style={[styles.title, { color: colors.text }]}>Security</Text>
-        <View style={{ width: 44 }} />
-      </View>
+      {/* Header */}
+      <Animated.View entering={FadeInDown.duration(600)} style={styles.header}>
+        <View style={[styles.headerContent, { paddingTop: insets.top + Spacing.lg }]}>
+          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+            <Ionicons name="arrow-back" size={24} color={colors.text} />
+          </TouchableOpacity>
+          <Text style={[styles.title, { color: colors.text }]}>Security</Text>
+          <View style={styles.placeholder} />
+        </View>
+      </Animated.View>
 
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <Animated.View entering={FadeInDown.delay(100).duration(600)}>
-          <Card>
-            <View style={styles.securityItem}>
-              <View style={[styles.iconContainer, { backgroundColor: colors.success + '15' }]}>
-                <Ionicons name="shield-checkmark" size={28} color={colors.success} />
-              </View>
-              <View style={styles.securityContent}>
-                <Text style={[styles.securityTitle, { color: colors.text }]}>Account Security</Text>
-                <Text style={[styles.securityDescription, { color: colors.textSecondary }]}>
-                  Your account is protected with email verification
-                  {user?.mfa_enabled && ' and two-factor authentication'}
-                </Text>
-              </View>
-            </View>
-          </Card>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Security Features */}
+        <Animated.View entering={FadeInUp.duration(800).delay(200)} style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Security Features</Text>
+          {securityFeatures.map((feature, index) => renderSecurityFeature(feature, index))}
         </Animated.View>
 
-        <Animated.View entering={FadeInDown.delay(200).duration(600)} style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Authentication</Text>
-          <Card padding="none">
+        {/* Password Change */}
+        <Animated.View entering={FadeInUp.duration(800).delay(400)} style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Change Password</Text>
+          <Card variant="default" padding="lg" style={styles.passwordCard}>
             <TouchableOpacity
-              style={[styles.menuItem, { borderBottomWidth: 1, borderBottomColor: colors.divider }]}
+              style={styles.passwordToggle}
               onPress={() => setShowPasswordForm(!showPasswordForm)}
             >
-              <View style={[styles.menuIcon, { backgroundColor: colors.primary + '10' }]}>
-                <Ionicons name="key" size={22} color={colors.primary} />
+              <View style={styles.passwordHeader}>
+                <View style={[
+                  styles.passwordIcon,
+                  { backgroundColor: colors.primary + '20' }
+                ]}>
+                  <Ionicons name="key" size={24} color={colors.primary} />
+                </View>
+                <View style={styles.passwordContent}>
+                  <Text style={[styles.passwordTitle, { color: colors.text }]}>
+                    Change Password
+                  </Text>
+                  <Text style={[styles.passwordDescription, { color: colors.textSecondary }]}>
+                    Update your account password for enhanced security
+                  </Text>
+                </View>
+                <Ionicons 
+                  name={showPasswordForm ? 'chevron-up' : 'chevron-down'} 
+                  size={20} 
+                  color={colors.textMuted} 
+                />
               </View>
-              <View style={styles.menuContent}>
-                <Text style={[styles.menuLabel, { color: colors.text }]}>Change Password</Text>
-                <Text style={[styles.menuDescription, { color: colors.textMuted }]}>
-                  Update your account password
-                </Text>
-              </View>
-              <Ionicons
-                name={showPasswordForm ? 'chevron-up' : 'chevron-forward'}
-                size={20}
-                color={colors.textMuted}
-              />
             </TouchableOpacity>
 
             {showPasswordForm && (
-              <View style={styles.passwordForm}>
-                <Input
-                  label="Current Password"
-                  placeholder="Enter current password"
-                  value={currentPassword}
-                  onChangeText={setCurrentPassword}
-                  secureTextEntry
-                />
-                <Input
-                  label="New Password"
-                  placeholder="Enter new password"
-                  value={newPassword}
-                  onChangeText={setNewPassword}
-                  secureTextEntry
-                />
-                <Input
-                  label="Confirm Password"
-                  placeholder="Confirm new password"
-                  value={confirmPassword}
-                  onChangeText={setConfirmPassword}
-                  secureTextEntry
-                />
-                <Button title="Update Password" onPress={handleChangePassword} fullWidth />
-              </View>
+              <Animated.View entering={FadeInUp.duration(400)}>
+                <View style={styles.passwordForm}>
+                  <Input
+                    label="Current Password"
+                    placeholder="Enter current password"
+                    value={currentPassword}
+                    onChangeText={setCurrentPassword}
+                    secureTextEntry
+                    leftIcon={<Ionicons name="lock-closed" size={20} color={colors.textMuted} />}
+                    variant="glass"
+                    style={styles.passwordInput}
+                  />
+                  <Input
+                    label="New Password"
+                    placeholder="Enter new password"
+                    value={newPassword}
+                    onChangeText={setNewPassword}
+                    secureTextEntry
+                    leftIcon={<Ionicons name="lock-closed" size={20} color={colors.textMuted} />}
+                    variant="glass"
+                    style={styles.passwordInput}
+                  />
+                  <Input
+                    label="Confirm Password"
+                    placeholder="Confirm new password"
+                    value={confirmPassword}
+                    onChangeText={setConfirmPassword}
+                    secureTextEntry
+                    leftIcon={<Ionicons name="lock-closed" size={20} color={colors.textMuted} />}
+                    variant="glass"
+                    style={styles.passwordInput}
+                  />
+                  {newPassword && (
+                    <View style={styles.passwordStrength}>
+                      <Text style={[styles.strengthLabel, { color: colors.textSecondary }]}>
+                        Password Strength: 
+                      </Text>
+                      <Text style={[
+                        styles.strengthValue,
+                        { color: getPasswordStrength(newPassword).color }
+                      ]}>
+                        {getPasswordStrength(newPassword).strength.toUpperCase()}
+                      </Text>
+                    </View>
+                  )}
+                  <Button
+                    title="Change Password"
+                    onPress={handleChangePassword}
+                    loading={isChangingPassword}
+                    gradient={true}
+                    fullWidth={true}
+                    size="lg"
+                  />
+                </View>
+              </Animated.View>
             )}
-
-            <TouchableOpacity style={styles.menuItem}>
-              <View style={[styles.menuIcon, { backgroundColor: colors.warning + '10' }]}>
-                <Ionicons name="phone-portrait" size={22} color={colors.warning} />
-              </View>
-              <View style={styles.menuContent}>
-                <Text style={[styles.menuLabel, { color: colors.text }]}>Two-Factor Authentication</Text>
-                <Text style={[styles.menuDescription, { color: colors.textMuted }]}>
-                  {user?.mfa_enabled ? 'Enabled' : 'Add extra security to your account'}
-                </Text>
-              </View>
-              <View style={[styles.statusBadge, { backgroundColor: user?.mfa_enabled ? colors.success + '20' : colors.surfaceVariant }]}>
-                <Text style={[styles.statusText, { color: user?.mfa_enabled ? colors.success : colors.textMuted }]}>
-                  {user?.mfa_enabled ? 'On' : 'Off'}
-                </Text>
-              </View>
-            </TouchableOpacity>
           </Card>
         </Animated.View>
 
-        <Animated.View entering={FadeInDown.delay(300).duration(600)} style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Biometrics</Text>
-          <Card padding="none">
-            <TouchableOpacity
-              style={styles.menuItem}
-              onPress={() => setBiometricEnabled(!biometricEnabled)}
-            >
-              <View style={[styles.menuIcon, { backgroundColor: colors.secondary + '10' }]}>
-                <Ionicons name="finger-print" size={22} color={colors.secondary} />
-              </View>
-              <View style={styles.menuContent}>
-                <Text style={[styles.menuLabel, { color: colors.text }]}>Biometric Login</Text>
-                <Text style={[styles.menuDescription, { color: colors.textMuted }]}>
-                  Use fingerprint or Face ID to login
-                </Text>
-              </View>
-              <View style={[styles.statusBadge, { backgroundColor: biometricEnabled ? colors.success + '20' : colors.surfaceVariant }]}>
-                <Text style={[styles.statusText, { color: biometricEnabled ? colors.success : colors.textMuted }]}>
-                  {biometricEnabled ? 'On' : 'Off'}
-                </Text>
-              </View>
-            </TouchableOpacity>
+        {/* Security Actions */}
+        <Animated.View entering={FadeInUp.duration(800).delay(600)} style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Security Actions</Text>
+          <Card variant="default" padding="none" style={styles.actionsCard}>
+            {securityActions.map((action, index) => renderSecurityAction(action, index))}
           </Card>
         </Animated.View>
 
-        <Animated.View entering={FadeInDown.delay(400).duration(600)} style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Sessions</Text>
-          <Card>
-            <View style={styles.sessionItem}>
-              <View style={[styles.sessionIcon, { backgroundColor: colors.primary + '15' }]}>
-                <Ionicons name="phone-portrait" size={20} color={colors.primary} />
-              </View>
-              <View style={styles.sessionContent}>
-                <Text style={[styles.sessionDevice, { color: colors.text }]}>This Device</Text>
-                <Text style={[styles.sessionInfo, { color: colors.textMuted }]}>
-                  Active now • Windows 11
-                </Text>
-              </View>
-              <View style={[styles.activeBadge, { backgroundColor: colors.success }]} />
-            </View>
-          </Card>
-        </Animated.View>
-
-        <View style={{ height: 100 }} />
+        <View style={{ height: Spacing.xxxl }} />
       </ScrollView>
     </View>
   );
@@ -212,121 +401,185 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
+    marginBottom: Spacing.lg,
+  },
+  headerContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: Spacing.lg,
-    paddingBottom: Spacing.md,
   },
   backButton: {
-    width: 44,
-    height: 44,
+    width: ComponentSize.iconButton.md,
+    height: ComponentSize.iconButton.md,
+    borderRadius: BorderRadius.full,
+    alignItems: 'center',
     justifyContent: 'center',
   },
   title: {
-    fontSize: FontSize.xl,
-    fontWeight: FontWeight.bold,
+    fontSize: FontSize.xxl,
+    fontWeight: FontWeight.bold as any,
+  },
+  placeholder: {
+    width: ComponentSize.iconButton.md,
   },
   content: {
-    paddingHorizontal: Spacing.lg,
-  },
-  securityItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  iconContainer: {
-    width: 56,
-    height: 56,
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: Spacing.md,
-  },
-  securityContent: {
-    flex: 1,
-  },
-  securityTitle: {
-    fontSize: FontSize.lg,
-    fontWeight: FontWeight.semibold,
-    marginBottom: 4,
-  },
-  securityDescription: {
-    fontSize: FontSize.sm,
-    lineHeight: 20,
+    paddingBottom: Spacing.xxl,
   },
   section: {
-    marginTop: Spacing.lg,
+    marginBottom: Spacing.xl,
   },
   sectionTitle: {
     fontSize: FontSize.lg,
-    fontWeight: FontWeight.semibold,
+    fontWeight: FontWeight.semibold as any,
     marginBottom: Spacing.md,
+    paddingHorizontal: Spacing.lg,
   },
-  menuItem: {
+  featureItem: {
+    marginBottom: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+  },
+  featureCard: {
+    ...Shadow.card,
+  },
+  featureHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: Spacing.md,
+    marginBottom: Spacing.md,
   },
-  menuIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    justifyContent: 'center',
+  featureIcon: {
+    width: ComponentSize.avatar.lg,
+    height: ComponentSize.avatar.lg,
+    borderRadius: BorderRadius.md,
     alignItems: 'center',
+    justifyContent: 'center',
     marginRight: Spacing.md,
   },
-  menuContent: {
+  featureContent: {
     flex: 1,
   },
-  menuLabel: {
+  featureTitle: {
     fontSize: FontSize.md,
-    fontWeight: FontWeight.medium,
+    fontWeight: FontWeight.semibold as any,
+    marginBottom: Spacing.xs,
   },
-  menuDescription: {
+  featureDescription: {
     fontSize: FontSize.sm,
-    marginTop: 2,
+    lineHeight: 18,
+  },
+  toggleButton: {
+    width: ComponentSize.buttonHeight.md,
+    height: ComponentSize.buttonHeight.sm,
+    borderRadius: BorderRadius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...Shadow.button,
+  },
+  toggleThumb: {
+    width: 16,
+    height: 16,
+    borderRadius: BorderRadius.full,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 2,
   },
   statusBadge: {
+    alignSelf: 'flex-start',
     paddingHorizontal: Spacing.sm,
     paddingVertical: Spacing.xs,
     borderRadius: BorderRadius.sm,
+    backgroundColor: '#F3F4F6',
+    color: '#4B5563',
   },
   statusText: {
     fontSize: FontSize.xs,
-    fontWeight: FontWeight.semibold,
+    fontWeight: FontWeight.semibold as any,
   },
-  passwordForm: {
-    padding: Spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: '#E2E8F0',
+  actionItem: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
   },
-  sessionItem: {
+  actionTouchable: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: Spacing.lg,
+  },
+  actionIcon: {
+    width: ComponentSize.avatar.md,
+    height: ComponentSize.avatar.md,
+    borderRadius: BorderRadius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: Spacing.md,
+  },
+  actionContent: {
+    flex: 1,
+  },
+  actionTitle: {
+    fontSize: FontSize.md,
+    fontWeight: FontWeight.semibold as any,
+    marginBottom: Spacing.xs,
+  },
+  actionDescription: {
+    fontSize: FontSize.sm,
+    lineHeight: 18,
+  },
+  passwordCard: {
+    ...Shadow.card,
+    marginHorizontal: Spacing.lg,
+  },
+  passwordToggle: {
+    padding: Spacing.lg,
+  },
+  passwordHeader: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  sessionIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    justifyContent: 'center',
+  passwordIcon: {
+    width: ComponentSize.avatar.lg,
+    height: ComponentSize.avatar.lg,
+    borderRadius: BorderRadius.md,
     alignItems: 'center',
+    justifyContent: 'center',
     marginRight: Spacing.md,
   },
-  sessionContent: {
+  passwordContent: {
     flex: 1,
   },
-  sessionDevice: {
+  passwordTitle: {
     fontSize: FontSize.md,
-    fontWeight: FontWeight.medium,
+    fontWeight: FontWeight.semibold as any,
+    marginBottom: Spacing.xs,
   },
-  sessionInfo: {
+  passwordDescription: {
     fontSize: FontSize.sm,
-    marginTop: 2,
+    lineHeight: 18,
   },
-  activeBadge: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
+  passwordForm: {
+    marginTop: Spacing.lg,
+    gap: Spacing.md,
+  },
+  passwordInput: {
+    marginBottom: Spacing.md,
+  },
+  passwordStrength: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: Spacing.sm,
+  },
+  strengthLabel: {
+    fontSize: FontSize.sm,
+  },
+  strengthValue: {
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.semibold as any,
+    marginLeft: Spacing.sm,
+  },
+  actionsCard: {
+    ...Shadow.card,
+    marginHorizontal: Spacing.lg,
   },
 });
 

@@ -8,18 +8,38 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  Dimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import Animated, { FadeInDown } from 'react-native-reanimated';
+import { LinearGradient } from 'expo-linear-gradient';
+import * as Haptics from 'expo-haptics';
+import Animated, { 
+  FadeInDown, 
+  FadeInUp,
+  FadeInRight,
+  useSharedValue, 
+  useAnimatedStyle, 
+  withSpring,
+} from 'react-native-reanimated';
 import { Button, Input, Card, KYCRequiredModal } from '../../components/ui';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuthStore } from '../../store/authStore';
 import { useWalletStore } from '../../store/walletStore';
 import { paymentService } from '../../services/paymentService';
-import { BorderRadius, FontSize, FontWeight, Spacing } from '../../constants/theme';
+import { 
+  BorderRadius, 
+  FontSize, 
+  FontWeight, 
+  Spacing, 
+  Shadow, 
+  AnimationConfig, 
+  ComponentSize 
+} from '../../constants/theme';
 import { DEV_CONFIG } from '../../constants/api';
+
+const { width } = Dimensions.get('window');
 
 const SendMoneyScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
@@ -83,138 +103,176 @@ const SendMoneyScreen: React.FC = () => {
     }
   };
 
+  const handleQuickAmount = (value: number) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setAmount(value.toString());
+  };
+
+  const handleContactSelect = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    // TODO: Navigate to contacts screen
+    Alert.alert('Coming Soon', 'Contact selection will be available soon');
+  };
+
   return (
     <KeyboardAvoidingView
       style={{ flex: 1 }}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <View style={[styles.header, { paddingTop: insets.top + Spacing.md }]}>
-          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-            <Ionicons name="arrow-back" size={24} color={colors.text} />
-          </TouchableOpacity>
-          <Text style={[styles.title, { color: colors.text }]}>Send Locally</Text>
-          <View style={{ width: 44 }} />
-        </View>
-
         <ScrollView
-          contentContainerStyle={styles.content}
-          keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
+          contentContainerStyle={[styles.contentContainer, { paddingTop: insets.top + Spacing.lg }]}
         >
-          <Animated.View entering={FadeInDown.delay(100).duration(600)}>
-            <Card style={styles.balanceCard}>
-              <Text style={[styles.balanceLabel, { color: colors.textSecondary }]}>
-                Available Balance
-              </Text>
-              <Text style={[styles.balanceAmount, { color: colors.text }]}>
-                {selectedWallet?.currency || 'GHS'}{' '}
-                {selectedWallet?.balance.toLocaleString('en-US', { minimumFractionDigits: 2 }) || '0.00'}
-              </Text>
+          {/* Header */}
+          <Animated.View entering={FadeInDown.duration(600)} style={styles.header}>
+            <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+              <Ionicons name="arrow-back" size={24} color={colors.text} />
+            </TouchableOpacity>
+            <Text style={[styles.title, { color: colors.text }]}>Send Money</Text>
+            <View style={styles.placeholder} />
+          </Animated.View>
+
+          {/* Balance Card */}
+          <Animated.View entering={FadeInUp.duration(800).delay(200)} style={styles.section}>
+            <Card variant="default" padding="lg">
+              <View style={styles.balanceHeader}>
+                <Text style={[styles.balanceLabel, { color: colors.textSecondary }]}>
+                  Available Balance
+                </Text>
+                <Text style={[styles.balanceAmount, { color: colors.text }]}>
+                  GHS {selectedWallet?.balance.toLocaleString() || '0.00'}
+                </Text>
+              </View>
+              <View style={styles.balanceFooter}>
+                <Text style={[styles.walletName, { color: colors.textMuted }]}>
+                  {selectedWallet?.currency || 'GHS'}
+                </Text>
+              </View>
             </Card>
           </Animated.View>
 
-          <Animated.View entering={FadeInDown.delay(200).duration(600)} style={styles.form}>
+          {/* Recipient Section */}
+          <Animated.View entering={FadeInUp.duration(800).delay(400)} style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Recipient</Text>
+            <TouchableOpacity
+              style={[styles.contactButton, { backgroundColor: colors.surface }]}
+              onPress={handleContactSelect}
+            >
+              <Ionicons name="people" size={20} color={colors.primary} />
+              <Text style={[styles.contactButtonText, { color: colors.primary }]}>
+                Choose from Contacts
+              </Text>
+              <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
+            </TouchableOpacity>
             <Input
-              label="Recipient"
-              placeholder="Phone number or email"
+              placeholder="Enter phone number"
               value={recipient}
               onChangeText={setRecipient}
-              leftIcon="person-outline"
+              keyboardType="phone-pad"
+              leftIcon={<Ionicons name="person" size={20} color={colors.textMuted} />}
               error={errors.recipient}
-            />
-
-            <Input
-              label="Amount"
-              placeholder="0.00"
-              value={amount}
-              onChangeText={setAmount}
-              keyboardType="decimal-pad"
-              leftIcon="cash-outline"
-              error={errors.amount}
-            />
-
-            <View style={styles.quickAmounts}>
-              {quickAmounts.map((amt) => (
-                <TouchableOpacity
-                  key={amt}
-                  style={[
-                    styles.quickAmountButton,
-                    { backgroundColor: colors.surfaceVariant },
-                    amount === amt.toString() && { backgroundColor: colors.primary },
-                  ]}
-                  onPress={() => setAmount(amt.toString())}
-                >
-                  <Text
-                    style={[
-                      styles.quickAmountText,
-                      { color: colors.text },
-                      amount === amt.toString() && { color: '#FFFFFF' },
-                    ]}
-                  >
-                    {amt}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            <Input
-              label="Description (Optional)"
-              placeholder="What's this for?"
-              value={description}
-              onChangeText={setDescription}
-              leftIcon="document-text-outline"
+              variant="glass"
             />
           </Animated.View>
 
-          <Animated.View entering={FadeInDown.delay(300).duration(600)} style={styles.summary}>
-            <Text style={[styles.summaryTitle, { color: colors.text }]}>Transaction Summary</Text>
-            <Card>
-              <View style={styles.summaryRow}>
-                <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>Amount</Text>
-                <Text style={[styles.summaryValue, { color: colors.text }]}>
-                  GHS {parseFloat(amount || '0').toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                </Text>
-              </View>
-              <View style={[styles.summaryRow, { borderTopWidth: 1, borderTopColor: colors.divider }]}>
-                <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>Fee</Text>
-                <Text style={[styles.summaryValue, { color: colors.text }]}>GHS 0.00</Text>
-              </View>
-              <View style={[styles.summaryRow, { borderTopWidth: 1, borderTopColor: colors.divider }]}>
-                <Text style={[styles.summaryLabel, { color: colors.text, fontWeight: FontWeight.semibold }]}>
-                  Total
-                </Text>
-                <Text style={[styles.summaryValue, { color: colors.primary, fontWeight: FontWeight.bold }]}>
-                  GHS {parseFloat(amount || '0').toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                </Text>
+          {/* Amount Section */}
+          <Animated.View entering={FadeInUp.duration(800).delay(600)} style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Amount</Text>
+            <Card variant="default" padding="lg" style={styles.amountCard}>
+              <View style={styles.amountInputContainer}>
+                <Text style={[styles.currencySymbol, { color: colors.primary }]}>GHS</Text>
+                <Input
+                  placeholder="0.00"
+                  value={amount}
+                  onChangeText={setAmount}
+                  keyboardType="numeric"
+                  variant="minimal"
+                  size="lg"
+                  style={styles.amountInput}
+                  textAlign="right"
+                />
               </View>
             </Card>
+
+            {/* Quick Amounts */}
+            <View style={styles.quickAmountsContainer}>
+              <Text style={[styles.quickAmountsLabel, { color: colors.textSecondary }]}>
+                Quick amounts
+              </Text>
+              <View style={styles.quickAmountsGrid}>
+                {quickAmounts.map((value, index) => (
+                  <Animated.View
+                    key={value}
+                    entering={FadeInUp.duration(400).delay(800 + index * 50)}
+                  >
+                    <TouchableOpacity
+                      style={[
+                        styles.quickAmountButton,
+                        { 
+                          backgroundColor: amount === value.toString() 
+                            ? colors.primary 
+                            : colors.surface 
+                        }
+                      ]}
+                      onPress={() => handleQuickAmount(value)}
+                    >
+                      <Text style={[
+                        styles.quickAmountText,
+                        { 
+                          color: amount === value.toString() 
+                            ? '#FFFFFF' 
+                            : colors.text 
+                        }
+                      ]}>
+                        {value}
+                      </Text>
+                    </TouchableOpacity>
+                  </Animated.View>
+                ))}
+              </View>
+            </View>
           </Animated.View>
 
-          <Animated.View entering={FadeInDown.delay(400).duration(600)}>
-            <Button
-              title="Send Money"
-              onPress={handleSend}
-              loading={isLoading}
-              fullWidth
-              size="lg"
-              icon={<Ionicons name="send" size={20} color="#FFFFFF" />}
+          {/* Description */}
+          <Animated.View entering={FadeInUp.duration(800).delay(800)} style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>
+              Description (Optional)
+            </Text>
+            <Input
+              placeholder="Add a note..."
+              value={description}
+              onChangeText={setDescription}
+              multiline
+              numberOfLines={3}
+              leftIcon={<Ionicons name="document-text-outline" size={20} color={colors.textMuted} />}
+              variant="default"
             />
           </Animated.View>
 
-          <View style={{ height: 40 }} />
+          {/* Send Button */}
+          <Animated.View entering={FadeInUp.duration(800).delay(1000)} style={styles.section}>
+            <Button
+              title={`Send GHS ${amount || '0.00'}`}
+              onPress={handleSend}
+              loading={isLoading}
+              disabled={!recipient || !amount || parseFloat(amount) <= 0}
+              gradient={true}
+              fullWidth={true}
+              size="lg"
+            />
+          </Animated.View>
+
+          <View style={{ height: Spacing.xxxl }} />
         </ScrollView>
+
+        {/* KYC Modal */}
+        <KYCRequiredModal
+          visible={showKYCModal}
+          onClose={() => setShowKYCModal(false)}
+          onVerifyNow={() => navigation.navigate('KYCVerification')}
+        />
       </View>
-      {/* KYC Required Modal */}
-      <KYCRequiredModal
-        visible={showKYCModal}
-        onClose={() => setShowKYCModal(false)}
-        onVerifyNow={() => {
-          setShowKYCModal(false);
-          navigation.navigate('Profile', { screen: 'KYCVerification' });
-        }}
-        kycStatus={user?.kyc_status}
-      />
     </KeyboardAvoidingView>
   );
 };
@@ -223,76 +281,115 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  contentContainer: {
+    paddingBottom: Spacing.xxl,
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: Spacing.md,
-    paddingBottom: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+    marginBottom: Spacing.xl,
   },
   backButton: {
-    width: 44,
-    height: 44,
+    width: ComponentSize.iconButton.md,
+    height: ComponentSize.iconButton.md,
+    borderRadius: BorderRadius.full,
+    alignItems: 'center',
     justifyContent: 'center',
   },
   title: {
-    fontSize: FontSize.xl,
-    fontWeight: FontWeight.bold,
-    letterSpacing: -0.3,
+    fontSize: FontSize.xxl,
+    fontWeight: FontWeight.bold as any,
   },
-  content: {
-    paddingHorizontal: Spacing.md,
+  placeholder: {
+    width: ComponentSize.iconButton.md,
   },
-  balanceCard: {
-    alignItems: 'center',
-    marginBottom: Spacing.lg,
+  section: {
+    paddingHorizontal: Spacing.lg,
+    marginBottom: Spacing.xl,
+  },
+  sectionTitle: {
+    fontSize: FontSize.lg,
+    fontWeight: FontWeight.semibold as any,
+    marginBottom: Spacing.md,
+  },
+  balanceHeader: {
+    marginBottom: Spacing.sm,
   },
   balanceLabel: {
     fontSize: FontSize.sm,
-    marginBottom: Spacing.xs,
+    fontWeight: FontWeight.medium as any,
   },
   balanceAmount: {
-    fontSize: FontSize.xxl,
-    fontWeight: FontWeight.bold,
-    letterSpacing: -0.5,
+    fontSize: FontSize.xxxl,
+    fontWeight: FontWeight.bold as any,
   },
-  form: {
-    marginBottom: Spacing.lg,
-  },
-  quickAmounts: {
+  balanceFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  walletName: {
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.medium as any,
+  },
+  contactButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
     marginBottom: Spacing.md,
   },
+  contactButtonText: {
+    fontSize: FontSize.md,
+    fontWeight: FontWeight.semibold as any,
+    flex: 1,
+    textAlign: 'center',
+  },
+  amountCard: {
+    marginBottom: Spacing.lg,
+  },
+  amountInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  currencySymbol: {
+    fontSize: FontSize.xxxl,
+    fontWeight: FontWeight.bold as any,
+    marginRight: Spacing.sm,
+  },
+  amountInput: {
+    flex: 1,
+    marginLeft: Spacing.sm,
+  },
+  quickAmountsContainer: {
+    marginTop: Spacing.lg,
+  },
+  quickAmountsLabel: {
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.medium as any,
+    marginBottom: Spacing.md,
+  },
+  quickAmountsGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
   quickAmountButton: {
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.full,
+    width: (width - Spacing.lg * 2 - Spacing.md * 5) / 6,
+    height: ComponentSize.buttonHeight.sm,
+    borderRadius: BorderRadius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'transparent',
   },
   quickAmountText: {
     fontSize: FontSize.sm,
-    fontWeight: FontWeight.medium,
-  },
-  summary: {
-    marginBottom: Spacing.lg,
-  },
-  summaryTitle: {
-    fontSize: FontSize.lg,
-    fontWeight: FontWeight.semibold,
-    marginBottom: Spacing.md,
-    letterSpacing: -0.3,
-  },
-  summaryRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: Spacing.sm,
-  },
-  summaryLabel: {
-    fontSize: FontSize.md,
-  },
-  summaryValue: {
-    fontSize: FontSize.md,
-    fontWeight: FontWeight.medium,
+    fontWeight: FontWeight.semibold as any,
   },
 });
 

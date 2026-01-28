@@ -6,17 +6,38 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
+  Dimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import Animated, { FadeInDown } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as Haptics from 'expo-haptics';
+import Animated, { 
+  FadeInDown, 
+  FadeInUp,
+  FadeInRight,
+  useSharedValue, 
+  useAnimatedStyle, 
+  withSpring,
+  interpolate,
+  Extrapolation,
+} from 'react-native-reanimated';
 import { Button, Card } from '../../components/ui';
 import { useTheme } from '../../context/ThemeContext';
-import { BorderRadius, FontSize, FontWeight, Spacing } from '../../constants/theme';
+import { 
+  BorderRadius, 
+  FontSize, 
+  FontWeight, 
+  Spacing, 
+  Shadow, 
+  AnimationConfig, 
+  ComponentSize 
+} from '../../constants/theme';
 import { paymentService } from '../../services/paymentService';
 import exchangeRateService from '../../services/exchangeRateService';
+
+const { width } = Dimensions.get('window');
 
 interface RemittanceConfirmParams {
   sendAmount: number;
@@ -61,6 +82,7 @@ const RemittanceConfirmScreen: React.FC = () => {
   const totalAmount = sendAmount + fee;
 
   const handleConfirm = async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setIsSubmitting(true);
     try {
       const response = await paymentService.sendRemittance({
@@ -89,228 +111,244 @@ const RemittanceConfirmScreen: React.FC = () => {
   };
 
   const handleDone = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     navigation.navigate('Home', { screen: 'Dashboard' });
   };
 
   const handleViewReceipt = () => {
     if (transactionId) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       navigation.navigate('TransactionReceipt', { transactionId });
     }
+  };
+
+  const handleCancel = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    navigation.goBack();
   };
 
   if (showSuccess) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <View style={[styles.successContainer, { paddingTop: insets.top + Spacing.xl }]}>
-          <Animated.View entering={FadeInDown.delay(100).duration(600)} style={styles.successContent}>
-            <View style={[styles.successIcon, { backgroundColor: colors.success + '20' }]}>
-              <Ionicons name="checkmark-circle" size={80} color={colors.success} />
-            </View>
-            <Text style={[styles.successTitle, { color: colors.text }]}>Transfer Successful!</Text>
-            <Text style={[styles.successSubtitle, { color: colors.textSecondary }]}>
-              Your money is on its way to {recipientName}
-            </Text>
+        <LinearGradient
+          colors={colors.gradient.success}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.gradient}
+        >
+          <View style={[styles.content, { paddingTop: insets.top + Spacing.xxxl }]}>
+            <Animated.View entering={FadeInUp.duration(1000)} style={styles.successContainer}>
+              <View style={[
+                styles.successIconContainer,
+                { backgroundColor: 'rgba(255, 255, 255, 0.2)' }
+              ]}>
+                <Ionicons name="checkmark-circle" size={64} color="#FFFFFF" />
+              </View>
+              <Text style={styles.successTitle}>Transfer Successful!</Text>
+              <Text style={styles.successText}>
+                Your money has been sent to {recipientName}
+              </Text>
+              
+              <View style={styles.transactionDetails}>
+                <Text style={styles.transactionId}>Transaction ID: {transactionId}</Text>
+                <Text style={styles.transactionTime}>Sent at {new Date().toLocaleTimeString()}</Text>
+              </View>
 
-            <Card style={styles.successCard}>
-              <View style={styles.successRow}>
-                <Text style={[styles.successLabel, { color: colors.textSecondary }]}>Amount Sent</Text>
-                <Text style={[styles.successValue, { color: colors.text }]}>
-                  {exchangeRateService.formatAmount(sendAmount, sourceCurrency)}
-                </Text>
+              <View style={styles.successActions}>
+                <Button
+                  title="View Receipt"
+                  onPress={handleViewReceipt}
+                  variant="outline"
+                  fullWidth={true}
+                  size="lg"
+                  style={styles.receiptButton}
+                />
+                <Button
+                  title="Done"
+                  onPress={handleDone}
+                  gradient={true}
+                  fullWidth={true}
+                  size="lg"
+                  style={styles.doneButton}
+                />
               </View>
-              <View style={[styles.successRow, { borderTopWidth: 1, borderTopColor: colors.divider }]}>
-                <Text style={[styles.successLabel, { color: colors.textSecondary }]}>Recipient Gets</Text>
-                <Text style={[styles.successValue, { color: colors.success }]}>
-                  {exchangeRateService.formatAmount(receiveAmount, targetCurrency)}
-                </Text>
-              </View>
-              <View style={[styles.successRow, { borderTopWidth: 1, borderTopColor: colors.divider }]}>
-                <Text style={[styles.successLabel, { color: colors.textSecondary }]}>Transaction ID</Text>
-                <Text style={[styles.successValue, { color: colors.primary }]}>
-                  {transactionId?.slice(0, 12)}...
-                </Text>
-              </View>
-              <View style={[styles.successRow, { borderTopWidth: 1, borderTopColor: colors.divider }]}>
-                <Text style={[styles.successLabel, { color: colors.textSecondary }]}>Estimated Delivery</Text>
-                <Text style={[styles.successValue, { color: colors.text }]}>Within 24 hours</Text>
-              </View>
-            </Card>
-
-            <View style={styles.successActions}>
-              <Button
-                title="View Receipt"
-                onPress={handleViewReceipt}
-                variant="outline"
-                fullWidth
-                icon={<Ionicons name="receipt-outline" size={20} color={colors.primary} />}
-              />
-              <View style={{ height: Spacing.md }} />
-              <Button
-                title="Done"
-                onPress={handleDone}
-                fullWidth
-                icon={<Ionicons name="checkmark" size={20} color="#FFFFFF" />}
-              />
-            </View>
-          </Animated.View>
-        </View>
+            </Animated.View>
+          </View>
+        </LinearGradient>
       </View>
     );
   }
 
+  const renderRecipientInfo = () => (
+    <Animated.View entering={FadeInUp.duration(800).delay(200)} style={styles.section}>
+      <Text style={[styles.sectionTitle, { color: colors.text }]}>Recipient Information</Text>
+      <Card variant="default" padding="lg" style={styles.recipientCard}>
+        <View style={styles.recipientHeader}>
+          <View style={styles.countryFlag}>
+            <Text style={styles.flagText}>{countryFlag}</Text>
+          </View>
+          <View style={styles.recipientDetails}>
+            <Text style={[styles.recipientName, { color: colors.text }]}>
+              {recipientName}
+            </Text>
+            <Text style={[styles.recipientPhone, { color: colors.textSecondary }]}>
+              {recipientPhone}
+            </Text>
+            <Text style={[styles.recipientCountry, { color: colors.textMuted }]}>
+              {recipientCountry}
+            </Text>
+          </View>
+        </View>
+      </Card>
+    </Animated.View>
+  );
+
+  const renderTransactionDetails = () => (
+    <Animated.View entering={FadeInUp.duration(800).delay(400)} style={styles.section}>
+      <Text style={[styles.sectionTitle, { color: colors.text }]}>Transaction Details</Text>
+      <Card variant="default" padding="lg" style={styles.transactionCard}>
+        <View style={styles.detailRow}>
+          <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>You Send</Text>
+          <Text style={[styles.detailValue, { color: colors.text }]}>
+            {sourceCurrency} {sendAmount.toFixed(2)}
+          </Text>
+        </View>
+        
+        <View style={styles.detailRow}>
+          <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>Exchange Rate</Text>
+          <Text style={[styles.detailValue, { color: colors.text }]}>
+            1 {sourceCurrency} = {exchangeRate} {targetCurrency}
+          </Text>
+        </View>
+        
+        <View style={styles.detailRow}>
+          <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>They Receive</Text>
+          <Text style={[styles.detailValue, { color: colors.success }]}>
+            {targetCurrency} {receiveAmount.toFixed(2)}
+          </Text>
+        </View>
+        
+        <View style={styles.detailRow}>
+          <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>Transfer Fee</Text>
+          <Text style={[styles.detailValue, { color: colors.warning }]}>
+            {sourceCurrency} {fee.toFixed(2)}
+          </Text>
+        </View>
+        
+        <View style={[styles.divider, { borderBottomColor: colors.borderLight }]} />
+        
+        <View style={styles.detailRow}>
+          <Text style={[styles.totalLabel, { color: colors.text }]}>Total Amount</Text>
+          <Text style={[styles.totalValue, { color: colors.primary }]}>
+            {sourceCurrency} {totalAmount.toFixed(2)}
+          </Text>
+        </View>
+      </Card>
+    </Animated.View>
+  );
+
+  const renderPaymentMethod = () => (
+    <Animated.View entering={FadeInUp.duration(800).delay(600)} style={styles.section}>
+      <Text style={[styles.sectionTitle, { color: colors.text }]}>Payment Method</Text>
+      <Card variant="default" padding="lg" style={styles.paymentCard}>
+        <View style={styles.paymentMethodRow}>
+          <View style={[
+            styles.paymentIcon,
+            { backgroundColor: colors.primary + '20' }
+          ]}>
+            <Ionicons name="card" size={24} color={colors.primary} />
+          </View>
+          <View style={styles.paymentContent}>
+            <Text style={[styles.paymentTitle, { color: colors.text }]}>
+              {paymentMethod}
+            </Text>
+            <Text style={[styles.paymentDescription, { color: colors.textSecondary }]}>
+              Funds will be deducted from this payment method
+            </Text>
+          </View>
+        </View>
+      </Card>
+    </Animated.View>
+  );
+
+  const renderSecurityNotice = () => (
+    <Animated.View entering={FadeInUp.duration(800).delay(800)} style={styles.section}>
+      <Card variant="gradient" padding="lg" style={styles.securityCard}>
+        <View style={styles.securityHeader}>
+          <View style={[
+            styles.securityIcon,
+            { backgroundColor: 'rgba(255, 255, 255, 0.2)' }
+          ]}>
+            <Ionicons name="shield-checkmark" size={24} color="#FFFFFF" />
+          </View>
+          <View style={styles.securityContent}>
+            <Text style={styles.securityTitle}>Secure Transfer</Text>
+            <Text style={styles.securityText}>
+              Your transfer is protected with bank-level security
+            </Text>
+          </View>
+        </View>
+      </Card>
+    </Animated.View>
+  );
+
+  const renderActions = () => (
+    <Animated.View entering={FadeInUp.duration(800).delay(1000)} style={styles.actionsSection}>
+      <View style={styles.actionsContainer}>
+        <Button
+          title="Cancel"
+          onPress={handleCancel}
+          variant="outline"
+          fullWidth={true}
+          size="lg"
+          style={styles.cancelButton}
+        />
+        <Button
+          title="Confirm Transfer"
+          onPress={handleConfirm}
+          loading={isSubmitting}
+          gradient={true}
+          fullWidth={true}
+          size="lg"
+          style={styles.confirmButton}
+        />
+      </View>
+    </Animated.View>
+  );
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={[styles.header, { paddingTop: insets.top + Spacing.md }]}>
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={24} color={colors.text} />
-        </TouchableOpacity>
-        <Text style={[styles.title, { color: colors.text }]}>Confirm Transfer</Text>
-        <View style={{ width: 44 }} />
-      </View>
+      {/* Header */}
+      <Animated.View entering={FadeInDown.duration(600)} style={styles.header}>
+        <View style={[styles.headerContent, { paddingTop: insets.top + Spacing.lg }]}>
+          <TouchableOpacity style={styles.backButton} onPress={handleCancel}>
+            <Ionicons name="arrow-back" size={24} color={colors.text} />
+          </TouchableOpacity>
+          <Text style={[styles.title, { color: colors.text }]}>Confirm Transfer</Text>
+          <View style={styles.placeholder} />
+        </View>
+      </Animated.View>
 
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        {/* Transfer Summary */}
-        <Animated.View entering={FadeInDown.delay(100).duration(600)}>
-          <LinearGradient
-            colors={[colors.primary, colors.secondary]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.summaryCard}
-          >
-            <View style={styles.summaryHeader}>
-              <Text style={styles.summaryLabel}>You're sending</Text>
-              <Text style={styles.summaryAmount}>
-                {exchangeRateService.formatAmount(sendAmount, sourceCurrency)}
-              </Text>
-            </View>
-            <View style={styles.arrowContainer}>
-              <Ionicons name="arrow-down" size={24} color="rgba(255,255,255,0.8)" />
-            </View>
-            <View style={styles.summaryFooter}>
-              <Text style={styles.summaryLabel}>{recipientName} receives</Text>
-              <Text style={styles.summaryAmount}>
-                {exchangeRateService.formatAmount(receiveAmount, targetCurrency)}
-              </Text>
-            </View>
-          </LinearGradient>
-        </Animated.View>
+        {/* Recipient Information */}
+        {renderRecipientInfo()}
 
-        {/* Recipient Details */}
-        <Animated.View entering={FadeInDown.delay(200).duration(600)} style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Recipient Details</Text>
-          <Card>
-            <View style={styles.detailRow}>
-              <View style={styles.detailIcon}>
-                <Ionicons name="person" size={20} color={colors.primary} />
-              </View>
-              <View style={styles.detailContent}>
-                <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>Name</Text>
-                <Text style={[styles.detailValue, { color: colors.text }]}>{recipientName}</Text>
-              </View>
-            </View>
-            <View style={[styles.detailRow, { borderTopWidth: 1, borderTopColor: colors.divider }]}>
-              <View style={styles.detailIcon}>
-                <Ionicons name="call" size={20} color={colors.primary} />
-              </View>
-              <View style={styles.detailContent}>
-                <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>Phone</Text>
-                <Text style={[styles.detailValue, { color: colors.text }]}>{recipientPhone}</Text>
-              </View>
-            </View>
-            <View style={[styles.detailRow, { borderTopWidth: 1, borderTopColor: colors.divider }]}>
-              <View style={styles.detailIcon}>
-                <Text style={{ fontSize: 20 }}>{countryFlag}</Text>
-              </View>
-              <View style={styles.detailContent}>
-                <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>Country</Text>
-                <Text style={[styles.detailValue, { color: colors.text }]}>{recipientCountry}</Text>
-              </View>
-            </View>
-          </Card>
-        </Animated.View>
-
-        {/* Transfer Details */}
-        <Animated.View entering={FadeInDown.delay(300).duration(600)} style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Transfer Details</Text>
-          <Card>
-            <View style={styles.detailRow}>
-              <Text style={[styles.feeLabel, { color: colors.textSecondary }]}>Send Amount</Text>
-              <Text style={[styles.feeValue, { color: colors.text }]}>
-                {exchangeRateService.formatAmount(sendAmount, sourceCurrency)}
-              </Text>
-            </View>
-            <View style={[styles.detailRow, { borderTopWidth: 1, borderTopColor: colors.divider }]}>
-              <Text style={[styles.feeLabel, { color: colors.textSecondary }]}>Exchange Rate</Text>
-              <Text style={[styles.feeValue, { color: colors.text }]}>
-                1 {sourceCurrency} = {exchangeRate.toFixed(4)} {targetCurrency}
-              </Text>
-            </View>
-            <View style={[styles.detailRow, { borderTopWidth: 1, borderTopColor: colors.divider }]}>
-              <Text style={[styles.feeLabel, { color: colors.textSecondary }]}>Transfer Fee</Text>
-              <Text style={[styles.feeValue, { color: colors.text }]}>
-                {exchangeRateService.formatAmount(fee, sourceCurrency)}
-              </Text>
-            </View>
-            <View style={[styles.detailRow, { borderTopWidth: 1, borderTopColor: colors.divider }]}>
-              <Text style={[styles.feeLabel, { color: colors.text, fontWeight: FontWeight.semibold }]}>
-                Total to Pay
-              </Text>
-              <Text style={[styles.feeValue, { color: colors.primary, fontWeight: FontWeight.bold }]}>
-                {exchangeRateService.formatAmount(totalAmount, sourceCurrency)}
-              </Text>
-            </View>
-          </Card>
-        </Animated.View>
+        {/* Transaction Details */}
+        {renderTransactionDetails()}
 
         {/* Payment Method */}
-        <Animated.View entering={FadeInDown.delay(400).duration(600)} style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Payment Method</Text>
-          <Card>
-            <View style={styles.paymentMethodRow}>
-              <View style={[styles.paymentIcon, { backgroundColor: colors.primary + '15' }]}>
-                <Ionicons 
-                  name={paymentMethod === 'wallet' ? 'wallet' : paymentMethod.includes('card') ? 'card' : 'phone-portrait'} 
-                  size={24} 
-                  color={colors.primary} 
-                />
-              </View>
-              <Text style={[styles.paymentMethodText, { color: colors.text }]}>
-                {paymentMethod === 'wallet' ? 'SikaRemit Balance' : 
-                 paymentMethod === 'card' ? 'Debit/Credit Card' :
-                 paymentMethod.includes('mtn') ? 'MTN Mobile Money' :
-                 paymentMethod.includes('telecel') ? 'Telecel Cash' : 'Mobile Money'}
-              </Text>
-              <Ionicons name="checkmark-circle" size={24} color={colors.success} />
-            </View>
-          </Card>
-        </Animated.View>
+        {renderPaymentMethod()}
 
-        {/* Disclaimer */}
-        <Animated.View entering={FadeInDown.delay(500).duration(600)} style={styles.section}>
-          <View style={[styles.disclaimer, { backgroundColor: colors.warning + '15' }]}>
-            <Ionicons name="information-circle" size={20} color={colors.warning} />
-            <Text style={[styles.disclaimerText, { color: colors.warning }]}>
-              By confirming, you agree to our terms and conditions. The recipient will receive the funds within 24 hours.
-            </Text>
-          </View>
-        </Animated.View>
+        {/* Security Notice */}
+        {renderSecurityNotice()}
 
-        {/* Confirm Button */}
-        <Animated.View entering={FadeInDown.delay(600).duration(600)}>
-          <Button
-            title="Confirm & Send"
-            onPress={handleConfirm}
-            loading={isSubmitting}
-            fullWidth
-            size="lg"
-            icon={<Ionicons name="send" size={20} color="#FFFFFF" />}
-          />
-        </Animated.View>
+        {/* Actions */}
+        {renderActions()}
 
-        <View style={{ height: 100 }} />
+        <View style={{ height: Spacing.xxxl }} />
       </ScrollView>
     </View>
   );
@@ -320,164 +358,228 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  gradient: {
+    flex: 1,
+  },
   header: {
+    marginBottom: Spacing.lg,
+  },
+  headerContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: Spacing.lg,
-    paddingBottom: Spacing.md,
   },
   backButton: {
-    width: 44,
-    height: 44,
+    width: ComponentSize.iconButton.md,
+    height: ComponentSize.iconButton.md,
+    borderRadius: BorderRadius.full,
+    alignItems: 'center',
     justifyContent: 'center',
   },
   title: {
-    fontSize: FontSize.xl,
-    fontWeight: FontWeight.bold,
+    fontSize: FontSize.xxl,
+    fontWeight: FontWeight.bold as any,
+  },
+  placeholder: {
+    width: ComponentSize.iconButton.md,
   },
   content: {
-    paddingHorizontal: Spacing.lg,
-  },
-  summaryCard: {
-    padding: Spacing.lg,
-    borderRadius: BorderRadius.xl,
-    marginBottom: Spacing.lg,
-  },
-  summaryHeader: {
-    alignItems: 'center',
-  },
-  summaryLabel: {
-    fontSize: FontSize.sm,
-    color: 'rgba(255,255,255,0.8)',
-    marginBottom: Spacing.xs,
-  },
-  summaryAmount: {
-    fontSize: 32,
-    fontWeight: FontWeight.bold,
-    color: '#FFFFFF',
-  },
-  arrowContainer: {
-    alignItems: 'center',
-    paddingVertical: Spacing.md,
-  },
-  summaryFooter: {
-    alignItems: 'center',
+    paddingBottom: Spacing.xxl,
   },
   section: {
-    marginBottom: Spacing.lg,
+    marginBottom: Spacing.xl,
   },
   sectionTitle: {
     fontSize: FontSize.lg,
-    fontWeight: FontWeight.semibold,
+    fontWeight: FontWeight.semibold as any,
     marginBottom: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+  },
+  recipientCard: {
+    ...Shadow.card,
+    marginHorizontal: Spacing.lg,
+  },
+  recipientHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  countryFlag: {
+    width: ComponentSize.avatar.xl,
+    height: ComponentSize.avatar.xl,
+    borderRadius: BorderRadius.full,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: Spacing.md,
+  },
+  flagText: {
+    fontSize: FontSize.xxl,
+  },
+  recipientDetails: {
+    flex: 1,
+  },
+  recipientName: {
+    fontSize: FontSize.lg,
+    fontWeight: FontWeight.semibold as any,
+    marginBottom: Spacing.xs,
+  },
+  recipientPhone: {
+    fontSize: FontSize.md,
+    marginBottom: Spacing.xs,
+  },
+  recipientCountry: {
+    fontSize: FontSize.sm,
+  },
+  transactionCard: {
+    ...Shadow.card,
+    marginHorizontal: Spacing.lg,
   },
   detailRow: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: Spacing.md,
-  },
-  detailIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: Spacing.md,
-  },
-  detailContent: {
-    flex: 1,
+    marginBottom: Spacing.md,
   },
   detailLabel: {
-    fontSize: FontSize.sm,
-    marginBottom: 2,
+    fontSize: FontSize.md,
   },
   detailValue: {
     fontSize: FontSize.md,
-    fontWeight: FontWeight.medium,
+    fontWeight: FontWeight.semibold as any,
   },
-  feeLabel: {
-    fontSize: FontSize.md,
-    flex: 1,
+  divider: {
+    borderBottomWidth: 1,
+    marginVertical: Spacing.md,
   },
-  feeValue: {
-    fontSize: FontSize.md,
+  totalLabel: {
+    fontSize: FontSize.lg,
+    fontWeight: FontWeight.semibold as any,
+  },
+  totalValue: {
+    fontSize: FontSize.lg,
+    fontWeight: FontWeight.bold as any,
+  },
+  paymentCard: {
+    ...Shadow.card,
+    marginHorizontal: Spacing.lg,
   },
   paymentMethodRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: Spacing.sm,
   },
   paymentIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-    justifyContent: 'center',
+    width: ComponentSize.avatar.lg,
+    height: ComponentSize.avatar.lg,
+    borderRadius: BorderRadius.md,
     alignItems: 'center',
+    justifyContent: 'center',
     marginRight: Spacing.md,
   },
-  paymentMethodText: {
+  paymentContent: {
+    flex: 1,
+  },
+  paymentTitle: {
     fontSize: FontSize.md,
-    fontWeight: FontWeight.medium,
-    flex: 1,
+    fontWeight: FontWeight.semibold as any,
+    marginBottom: Spacing.xs,
   },
-  disclaimer: {
-    flexDirection: 'row',
-    padding: Spacing.md,
-    borderRadius: BorderRadius.lg,
-    gap: Spacing.sm,
-  },
-  disclaimerText: {
+  paymentDescription: {
     fontSize: FontSize.sm,
-    flex: 1,
-    lineHeight: 20,
   },
-  successContainer: {
-    flex: 1,
-    paddingHorizontal: Spacing.lg,
+  securityCard: {
+    ...Shadow.card,
+    marginHorizontal: Spacing.lg,
   },
-  successContent: {
-    flex: 1,
+  securityHeader: {
+    flexDirection: 'row',
     alignItems: 'center',
   },
-  successIcon: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
+  securityIcon: {
+    width: ComponentSize.avatar.lg,
+    height: ComponentSize.avatar.lg,
+    borderRadius: BorderRadius.md,
+    alignItems: 'center',
     justifyContent: 'center',
-    alignItems: 'center',
+    marginRight: Spacing.md,
+  },
+  securityContent: {
+    flex: 1,
+  },
+  securityTitle: {
+    fontSize: FontSize.md,
+    fontWeight: FontWeight.semibold as any,
+    color: '#FFFFFF',
+    marginBottom: Spacing.xs,
+  },
+  securityText: {
+    fontSize: FontSize.sm,
+    color: 'rgba(255,255,255,0.9)',
+  },
+  actionsSection: {
+    paddingHorizontal: Spacing.lg,
     marginBottom: Spacing.lg,
   },
-  successTitle: {
-    fontSize: FontSize.xxl,
-    fontWeight: FontWeight.bold,
+  actionsContainer: {
+    gap: Spacing.md,
+  },
+  cancelButton: {
     marginBottom: Spacing.sm,
   },
-  successSubtitle: {
-    fontSize: FontSize.md,
+  confirmButton: {
+    marginBottom: Spacing.sm,
+  },
+  successContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: Spacing.lg,
+  },
+  successIconContainer: {
+    width: ComponentSize.avatar.xxl,
+    height: ComponentSize.avatar.xxl,
+    borderRadius: BorderRadius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: Spacing.xl,
+  },
+  successTitle: {
+    fontSize: FontSize.display,
+    fontWeight: FontWeight.black as any,
+    color: '#FFFFFF',
+    textAlign: 'center',
+    marginBottom: Spacing.md,
+  },
+  successText: {
+    fontSize: FontSize.lg,
+    color: 'rgba(255,255,255,0.9)',
     textAlign: 'center',
     marginBottom: Spacing.xl,
   },
-  successCard: {
-    width: '100%',
+  transactionDetails: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
     marginBottom: Spacing.xl,
+    alignItems: 'center',
   },
-  successRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: Spacing.md,
+  transactionId: {
+    fontSize: FontSize.sm,
+    color: '#FFFFFF',
+    marginBottom: Spacing.xs,
   },
-  successLabel: {
-    fontSize: FontSize.md,
-  },
-  successValue: {
-    fontSize: FontSize.md,
-    fontWeight: FontWeight.medium,
+  transactionTime: {
+    fontSize: FontSize.xs,
+    color: 'rgba(255,255,255,0.8)',
   },
   successActions: {
+    gap: Spacing.md,
     width: '100%',
-    marginTop: 'auto',
-    paddingBottom: Spacing.xl,
+  },
+  receiptButton: {
+    marginBottom: Spacing.sm,
+  },
+  doneButton: {
+    marginBottom: Spacing.sm,
   },
 });
 

@@ -20,6 +20,7 @@ interface User {
   first_name: string
   last_name: string
   user_type: number
+  role: string // 'admin' | 'merchant' | 'customer' - computed by backend
   is_active: boolean
   created_at: string
 }
@@ -47,6 +48,7 @@ async function fetchUsers(search: string = ''): Promise<User[]> {
 export default function AdminUsersPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [showInactive, setShowInactive] = useState(false) // Hide deleted/inactive users by default
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
@@ -67,11 +69,14 @@ export default function AdminUsersPage() {
 
   const queryClient = useQueryClient()
 
-  const { data: users = [], isLoading } = useQuery({
+  const { data: allUsers = [], isLoading } = useQuery({
     queryKey: ['admin-users', debouncedSearch],
     queryFn: () => fetchUsers(debouncedSearch),
     retry: false
   })
+
+  // Filter users based on showInactive toggle
+  const users = showInactive ? allUsers : allUsers.filter(user => user.is_active)
 
   const handleSearch = (value: string) => {
     setSearchTerm(value)
@@ -81,7 +86,12 @@ export default function AdminUsersPage() {
   const createUserMutation = useMutation({
     mutationFn: async (userData: typeof createFormData) => {
       const token = localStorage.getItem('access_token')
-      const response = await axios.post(`${API_URL}/api/v1/accounts/admin/users/`, userData, {
+      // Convert user_type to integer for backend
+      const payload = {
+        ...userData,
+        user_type: parseInt(userData.user_type, 10)
+      }
+      const response = await axios.post(`${API_URL}/api/v1/accounts/admin/users/`, payload, {
         headers: { Authorization: `Bearer ${token}` }
       })
       return response.data
@@ -125,7 +135,12 @@ export default function AdminUsersPage() {
   const updateUserMutation = useMutation({
     mutationFn: async ({ userId, userData }: { userId: number, userData: typeof editFormData }) => {
       const token = localStorage.getItem('access_token')
-      const response = await axios.patch(`${API_URL}/api/v1/accounts/admin/users/${userId}/`, userData, {
+      // Convert user_type to integer for backend
+      const payload = {
+        ...userData,
+        user_type: parseInt(userData.user_type, 10)
+      }
+      const response = await axios.patch(`${API_URL}/api/v1/accounts/admin/users/${userId}/`, payload, {
         headers: { Authorization: `Bearer ${token}` }
       })
       return response.data
@@ -194,6 +209,15 @@ export default function AdminUsersPage() {
     setCreateFormData(prev => ({ ...prev, [field]: value }))
   }
 
+  const getRoleInfo = (role: string) => {
+    const roles: Record<string, { label: string, color: string, bgColor: string, icon: string }> = {
+      'admin': { label: 'Admin', color: 'text-red-700', bgColor: 'bg-red-100', icon: '👑' },
+      'merchant': { label: 'Merchant', color: 'text-blue-700', bgColor: 'bg-blue-100', icon: '🏪' },
+      'customer': { label: 'Customer', color: 'text-green-700', bgColor: 'bg-green-100', icon: '👤' }
+    }
+    return roles[role] || { label: 'Unknown', color: 'text-gray-700', bgColor: 'bg-gray-100', icon: '❓' }
+  }
+
   const getUserTypeInfo = (type: number | string) => {
     const numType = typeof type === 'string' ? parseInt(type, 10) : type
     const types: Record<number, { label: string, color: string, bgColor: string, icon: string }> = {
@@ -204,24 +228,14 @@ export default function AdminUsersPage() {
     return types[numType] || { label: 'Unknown', color: 'text-gray-700', bgColor: 'bg-gray-100', icon: '❓' }
   }
 
-  const getUserTypeLabel = (type: number) => {
-    return getUserTypeInfo(type).label
-  }
-
-  const autoIdentifyUserType = (user: User) => {
-    // Auto-identification logic based on user attributes
-    if (user.user_type) {
-      return getUserTypeInfo(user.user_type)
+  // Use backend's role field which correctly identifies admin via is_staff/is_superuser
+  const getDisplayRole = (user: User) => {
+    // Backend computes role based on is_staff/is_superuser OR user_type
+    if (user.role) {
+      return getRoleInfo(user.role)
     }
-
-    // Fallback logic if user_type is not set
-    if (user.email?.includes('admin') || user.email?.includes('support')) {
-      return getUserTypeInfo(1) // Likely Admin
-    }
-
-    // Check for merchant indicators (this could be enhanced with more business logic)
-    // For now, default to Customer
-    return getUserTypeInfo(3)
+    // Fallback to user_type if role not available
+    return getUserTypeInfo(user.user_type || 3)
   }
 
   return (
@@ -254,9 +268,16 @@ export default function AdminUsersPage() {
                   data-testid="search-input"
                 />
               </div>
-              <Button variant="outline" className="bg-white/50 backdrop-blur-sm border-white/30 hover:bg-white/70 hover:border-purple-200/50 shadow-lg shadow-purple-500/5 transition-all duration-300" data-testid="filter-button">
+              <Button 
+                variant="outline" 
+                className={`backdrop-blur-sm border-white/30 shadow-lg shadow-purple-500/5 transition-all duration-300 ${
+                  showInactive ? 'bg-purple-100 hover:bg-purple-200 border-purple-300' : 'bg-white/50 hover:bg-white/70 hover:border-purple-200/50'
+                }`}
+                onClick={() => setShowInactive(!showInactive)}
+                data-testid="filter-button"
+              >
                 <Filter className="h-4 w-4 mr-2" />
-                Filter
+                {showInactive ? 'Hide Inactive' : 'Show Inactive'}
               </Button>
             </div>
           </CardHeader>
@@ -292,12 +313,12 @@ export default function AdminUsersPage() {
                           <td className="p-4">{user.first_name} {user.last_name}</td>
                           <td className="p-4">
                             <span className={`inline-flex items-center gap-2 px-2 py-1 rounded-full text-xs font-medium ${
-                              autoIdentifyUserType(user).bgColor
+                              getDisplayRole(user).bgColor
                             } ${
-                              autoIdentifyUserType(user).color
+                              getDisplayRole(user).color
                             }`}>
-                              <span>{autoIdentifyUserType(user).icon}</span>
-                              {autoIdentifyUserType(user).label}
+                              <span>{getDisplayRole(user).icon}</span>
+                              {getDisplayRole(user).label}
                             </span>
                           </td>
                           <td className="p-4">
@@ -367,12 +388,12 @@ export default function AdminUsersPage() {
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label className="text-right font-medium">User Type:</Label>
                 <span className={`col-span-3 inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium w-fit ${
-                  autoIdentifyUserType(selectedUser).bgColor
+                  getDisplayRole(selectedUser).bgColor
                 } ${
-                  autoIdentifyUserType(selectedUser).color
+                  getDisplayRole(selectedUser).color
                 }`}>
-                  <span className="text-lg">{autoIdentifyUserType(selectedUser).icon}</span>
-                  {autoIdentifyUserType(selectedUser).label}
+                  <span className="text-lg">{getDisplayRole(selectedUser).icon}</span>
+                  {getDisplayRole(selectedUser).label}
                   {!selectedUser.user_type && (
                     <span className="text-xs opacity-75">(Auto-identified)</span>
                   )}

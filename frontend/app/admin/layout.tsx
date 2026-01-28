@@ -1,14 +1,19 @@
 'use client'
 
+import { useState } from 'react'
 import { redirect } from 'next/navigation'
-import { Globe } from 'lucide-react'
+import { Globe, Menu, Bell } from 'lucide-react'
 import AdminSidebar from '@/components/admin/AdminSidebar'
+import AdminHeader from '@/components/admin/AdminHeader'
 import { useAuth } from '@/lib/auth/context'
 import { useSession } from '@/lib/auth/session-provider'
+import { Button } from '@/components/ui/button'
+import { AdminNotificationBell } from '@/components/admin/AdminNotificationBell'
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()
   const session = useSession()
+  const [sidebarOpen, setSidebarOpen] = useState(false)
 
   // Show loading state while checking authentication
   if (loading || session.status === 'loading') {
@@ -54,11 +59,25 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   return (
     <div className="min-h-screen bg-background">
-      <AdminSidebar />
+      {/* Mobile overlay */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
 
-      <div className="pl-64">
-        <main className="min-h-screen">
-          <div className="revolut-container py-6 lg:py-8">
+      <AdminSidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+
+      <AdminHeader
+        onMenuClick={() => setSidebarOpen(!sidebarOpen)}
+        sidebarOpen={sidebarOpen}
+      />
+
+      <div className="lg:pl-64">
+
+        <main className="min-h-[calc(100vh-3.5rem)] sm:min-h-[calc(100vh-4rem)] lg:min-h-screen">
+          <div className="px-3 py-4 sm:px-4 sm:py-6 md:px-6 lg:px-8">
             {children}
           </div>
         </main>

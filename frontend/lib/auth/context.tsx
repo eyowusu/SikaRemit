@@ -4,6 +4,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { useRouter } from 'next/navigation'
 import axios from 'axios'
 import apiClient from '@/lib/api/client'
+import api from '@/lib/api/axios'
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
@@ -78,6 +79,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         console.log('🔐 Found stored auth data, authenticating...')
         apiClient.defaults.headers.common['Authorization'] = `Bearer ${token}`
+        api.defaults.headers.common['Authorization'] = `Bearer ${token}`
 
         try {
           const userData = JSON.parse(storedUserData)
@@ -117,6 +119,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       sessionStorage.removeItem('refresh_token')
       sessionStorage.removeItem('user_data')
       delete apiClient.defaults.headers.common['Authorization']
+      delete api.defaults.headers.common['Authorization']
     }
 
     // Check auth status on initial load
@@ -138,12 +141,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  const login = async (email: string, password: string): Promise<string> => {
-    console.log('🔐 Auth Context: login called with email:', email)
+  const login = async (email: string, password: string) => {
     setLoading(true)
+    console.log('🔐 Auth Context: Starting login process for:', email)
 
     try {
-      console.log('🔐 Auth Context: Making API call to login')
+      console.log('🔐 Auth Context: Making API call to login endpoint')
       const response = await apiClient.post('/api/v1/accounts/login/', {
         email,
         password
@@ -231,13 +234,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       document.cookie = 'access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
       document.cookie = 'refresh_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
 
-      // Clear local storage and state
+      // Clear local storage
       localStorage.removeItem('access_token')
       localStorage.removeItem('refresh_token')
       localStorage.removeItem('user_data')
       localStorage.removeItem('user_type_info')
+      
+      // Clear session storage
+      sessionStorage.removeItem('access_token')
+      sessionStorage.removeItem('refresh_token')
+      sessionStorage.removeItem('user_data')
+      sessionStorage.removeItem('user_type_info')
+      
+      // Clear API client auth header
+      delete apiClient.defaults.headers.common['Authorization']
+      delete api.defaults.headers.common['Authorization']
+      
+      // Clear state
       setUser(null)
       setUserTypeInfo(null)
+      
+      console.log('🔐 Logged out, cleared all auth data')
+      
       // Use window.location for hard redirect to avoid hook issues
       window.location.href = '/auth'
     }

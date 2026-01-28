@@ -61,6 +61,18 @@ class DashboardStatsViewSet(viewsets.ModelViewSet):
             
         return queryset
 
+    def list(self, request, *args, **kwargs):
+        """List dashboard stats with error handling"""
+        try:
+            return super().list(request, *args, **kwargs)
+        except Exception as e:
+            # Return empty stats on error
+            return Response({
+                'results': [],
+                'count': 0,
+                'error': str(e)
+            })
+
 class BusinessSummaryView(APIView):
     permission_classes = [permissions.IsAuthenticated]
     

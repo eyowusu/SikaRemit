@@ -53,6 +53,7 @@ import {
   Mail,
   Printer
 } from 'lucide-react'
+import { DateRangePicker } from '@/components/ui/date-range-picker'
 import {
   generateReceipt,
   downloadReceipt,
@@ -73,14 +74,17 @@ export default function MerchantTransactionsPage() {
   const [sortBy, setSortBy] = useState('date')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
   const [selectedTransactions, setSelectedTransactions] = useState<string[]>([])
+  const [dateRange, setDateRange] = useState<{ from: Date | undefined; to: Date | undefined } | undefined>()
 
   const { formatAmount, currency, convertAmount } = useCurrency()
   const { toast } = useToast()
 
   const { data: transactions, isLoading } = useQuery({
-    queryKey: ['merchant-transactions', searchTerm, statusFilter, sortBy, sortOrder],
+    queryKey: ['merchant-transactions', searchTerm, statusFilter, sortBy, sortOrder, dateRange],
     queryFn: () => TransactionsAPI.getTransactions({
-      status: statusFilter !== 'all' ? statusFilter : undefined
+      status: statusFilter !== 'all' ? statusFilter : undefined,
+      start_date: dateRange?.from?.toISOString(),
+      end_date: dateRange?.to?.toISOString()
     })
   })
 
@@ -416,9 +420,9 @@ export default function MerchantTransactionsPage() {
                 </div>
               </div>
 
-              <div className="flex gap-3">
+              <div className="flex flex-col sm:flex-row gap-3">
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="w-48 h-12 border-2 border-gray-200 dark:border-gray-700 rounded-xl">
+                  <SelectTrigger className="w-full sm:w-48 h-12 border-2 border-gray-200 dark:border-gray-700 rounded-xl">
                     <Filter className="w-4 h-4 mr-2" />
                     <SelectValue placeholder="Filter by status" />
                   </SelectTrigger>
@@ -431,11 +435,14 @@ export default function MerchantTransactionsPage() {
                   </SelectContent>
                 </Select>
 
-                <Button variant="outline" size="lg" className="border-2 border-gray-200 dark:border-gray-700 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800">
-                  <Calendar className="w-4 h-4 mr-2" />
-                  Date Range
-                  <ChevronDown className="w-4 h-4 ml-2" />
-                </Button>
+                <div className="w-full sm:w-64">
+                  <DateRangePicker
+                    value={dateRange}
+                    onChange={setDateRange}
+                    placeholder="Select date range"
+                    className="h-12 border-2 border-gray-200 dark:border-gray-700 rounded-xl"
+                  />
+                </div>
               </div>
             </div>
 

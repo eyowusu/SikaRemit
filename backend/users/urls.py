@@ -44,6 +44,9 @@ urlpatterns = [
     path('customers/<int:pk>/check-liveness/', views.CustomerViewSet.as_view({'post': 'check_liveness'}), name='check-liveness'),
     path('customers/me/', views.CustomerViewSet.as_view({'get': 'me'}), name='customer-me'),
 
+    # Test endpoint
+    path('merchant-customers/test-stats/', views.test_merchant_customers_stats, name='test-merchant-customers-stats'),
+
     # Unified admin KYC inbox (merchant-customer + direct customer)
     path('admin-kyc-inbox/', AdminKYCInboxView.as_view(), name='admin-kyc-inbox'),
     path('admin-kyc-inbox/stats/', AdminKYCInboxStatsView.as_view(), name='admin-kyc-inbox-stats'),

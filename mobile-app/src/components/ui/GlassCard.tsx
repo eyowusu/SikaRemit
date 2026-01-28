@@ -111,7 +111,7 @@ export const GlassCard: React.FC<GlassCardProps> = ({
         style={[
           styles.elevatedCard,
           {
-            backgroundColor: colors.card,
+            backgroundColor: colors.surface,
             padding: paddingValue,
             ...Shadow.lg,
           },
@@ -130,8 +130,8 @@ export const GlassCard: React.FC<GlassCardProps> = ({
       style={[
         styles.outlinedCard,
         {
-          backgroundColor: colors.card,
-          borderColor: colors.cardBorder,
+          backgroundColor: colors.surface,
+          borderColor: '#E5E7EB',
           padding: paddingValue,
         },
         animatedStyle,

@@ -158,20 +158,20 @@ export default function CustomerDashboard() {
   ]
 
   return (
-    <div className="revolut-container py-4 sm:py-6 lg:py-8">
+    <div className="revolut-container py-3 sm:py-4 md:py-6 lg:py-8">
           {/* Header - Revolut Style */}
-          <div className="mb-10">
-            <div className="mb-6">
+          <div className="mb-6 sm:mb-8 lg:mb-10">
+            <div className="mb-4 sm:mb-6">
               <div className="space-y-2">
-                <div className="flex items-center gap-3 sm:gap-4 mb-2">
-                  <div className="w-12 h-12 bg-primary rounded-2xl flex items-center justify-center shadow-revolut">
-                    <DollarSign className="h-6 w-6 text-primary-foreground" />
+                <div className="flex items-center gap-2 sm:gap-3 md:gap-4 mb-2">
+                  <div className="w-10 h-10 sm:w-12 sm:h-12 bg-primary rounded-2xl flex items-center justify-center shadow-revolut">
+                    <DollarSign className="h-5 w-5 sm:h-6 sm:w-6 text-primary-foreground" />
                   </div>
-                  <div>
-                    <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-foreground">
+                  <div className="flex-1 min-w-0">
+                    <h1 className="text-lg sm:text-xl lg:text-2xl xl:text-3xl font-bold text-foreground truncate">
                       Welcome back, {(session?.user as any)?.firstName || 'Customer'}!
                     </h1>
-                    <p className="text-muted-foreground mt-1">
+                    <p className="text-xs sm:text-sm text-muted-foreground">
                       Your financial dashboard awaits
                     </p>
                     {userTypeInfo && (
@@ -261,7 +261,7 @@ export default function CustomerDashboard() {
                 <span className="text-xs font-medium text-green-600">All Systems Operational</span>
               </div>
             </div>
-            <div className="grid gap-3 sm:gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7">
+            <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {quickActions.map((action) => (
                 <Link key={action.title} href={action.href} className="block">
                   <div className="revolut-quick-action h-full">
@@ -281,7 +281,7 @@ export default function CustomerDashboard() {
           </div>
 
           {/* Activity Section - Revolut Style */}
-          <div className="grid gap-4 sm:gap-6 lg:grid-cols-3">
+          <div className="grid gap-4 sm:gap-6 lg:grid-cols-2 xl:grid-cols-3">
             {/* Recent Transactions */}
             <div className="lg:col-span-2">
               <Card>
@@ -297,7 +297,7 @@ export default function CustomerDashboard() {
                       </div>
                     </div>
                     <Button variant="outline" size="sm" asChild className="w-full sm:w-auto">
-                      <Link href="/customer/account">View All</Link>
+                      <Link href="/customer/transactions">View All</Link>
                     </Button>
                   </div>
                 </CardHeader>

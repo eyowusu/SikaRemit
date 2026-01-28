@@ -210,6 +210,46 @@ class ExchangeRateUpdateService:
         except Exception as e:
             logger.error(f"Failed to broadcast rate update: {str(e)}")
 
+    def notify_significant_rate_change(self, currency_code: str, old_rate: float, new_rate: float, threshold_percent: float = 5.0):
+        """
+        Notify users about significant exchange rate changes
+        """
+        try:
+            from notifications.services import NotificationService
+            from users.models import User
+            
+            # Calculate percentage change
+            if old_rate == 0:
+                return
+            change_percent = abs((new_rate - old_rate) / old_rate * 100)
+            
+            if change_percent >= threshold_percent:
+                direction = "increased" if new_rate > old_rate else "decreased"
+                
+                # Notify all active users who might be affected
+                # (customers and merchants who use this currency)
+                active_users = User.objects.filter(is_active=True)
+                
+                for user in active_users[:100]:  # Limit to prevent overload
+                    NotificationService.create_notification(
+                        user=user,
+                        title=f"Exchange Rate Alert: {currency_code}",
+                        message=f"The {currency_code} exchange rate has {direction} by {change_percent:.1f}%. New rate: {new_rate:.4f}",
+                        level='info',
+                        notification_type='exchange_rate_update',
+                        metadata={
+                            'currency_code': currency_code,
+                            'old_rate': str(old_rate),
+                            'new_rate': str(new_rate),
+                            'change_percent': str(change_percent),
+                            'direction': direction
+                        }
+                    )
+                
+                logger.info(f"Sent exchange rate change notifications for {currency_code} ({change_percent:.1f}% change)")
+        except Exception as e:
+            logger.error(f"Failed to send exchange rate notifications: {e}")
+
     def _update_fallback_rates(self) -> bool:
         """
         Update with fallback rates when API is unavailable

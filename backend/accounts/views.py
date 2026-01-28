@@ -3,6 +3,7 @@ from rest_framework import status
 from rest_framework.decorators import action
 from django.contrib.auth import get_user_model
 from django.utils import timezone
+from notifications.services import NotificationService
 from .serializers import (
     UserLoginSerializer, UserRegisterSerializer, AccountsUserSerializer, MyTokenObtainPairSerializer,
     CheckoutSerializer, AccountsTransactionSerializer, PaymentsTransactionSerializer, AdminActivitySerializer,
@@ -138,12 +139,66 @@ class AdminUserViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(email__icontains=email)
         return queryset
 
+    def create(self, request, *args, **kwargs):
+        """Create a new user with password handling"""
+        try:
+            data = request.data.copy()
+            password = data.pop('password', None)
+            
+            serializer = self.get_serializer(data=data)
+            serializer.is_valid(raise_exception=True)
+            
+            user = serializer.save()
+            
+            # Set password if provided, otherwise generate one
+            if password:
+                user.set_password(password)
+            else:
+                # Generate a random password
+                import secrets
+                temp_password = secrets.token_urlsafe(12)
+                user.set_password(temp_password)
+            
+            user.save()
+            
+            return Response(
+                self.get_serializer(user).data,
+                status=status.HTTP_201_CREATED
+            )
+        except Exception as e:
+            logger.error(f"Error creating user: {str(e)}")
+            return Response(
+                {'error': f'Failed to create user: {str(e)}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
     def perform_update(self, serializer):
         # Prevent admins from changing their own status
         if self.request.user == serializer.instance and \
            'is_active' in serializer.validated_data:
             raise Exception("You cannot change your own status")
         serializer.save()
+
+    def destroy(self, request, *args, **kwargs):
+        """Delete user with proper error handling"""
+        try:
+            instance = self.get_object()
+            # Prevent deleting yourself
+            if instance == request.user:
+                return Response(
+                    {'error': 'You cannot delete your own account'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            # Soft delete or hard delete
+            instance.is_active = False
+            instance.save()
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        except Exception as e:
+            logger.error(f"Error deleting user: {str(e)}")
+            return Response(
+                {'error': f'Failed to delete user: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 class UserRegisterView(APIView):
     """
@@ -181,6 +236,21 @@ class UserRegisterView(APIView):
                 first_name=serializer.validated_data.get('first_name'),
                 last_name=serializer.validated_data.get('last_name'),
                 phone=serializer.validated_data.get('phone', '')
+            )
+            
+            # Notify admins about new user registration
+            user_type_label = {1: 'Admin', 2: 'Merchant', 3: 'Customer'}.get(auto_detected_type, 'User')
+            NotificationService.notify_admins(
+                title=f"New {user_type_label} Registration",
+                message=f"A new {user_type_label.lower()} has registered: {user.email}",
+                level='info',
+                notification_type='account_registered',
+                metadata={
+                    'user_id': user.id,
+                    'email': user.email,
+                    'user_type': auto_detected_type,
+                    'user_type_label': user_type_label
+                }
             )
             
             tokens = AuthService.get_tokens_for_user(user)
@@ -270,8 +340,13 @@ class UserLoginView(APIView):
                     {'error': 'Authentication failed. Please try again.'},
                     status=500
                 )
-            
+
             role_mapping = {1: 'admin', 2: 'merchant', 3: 'customer'}
+
+            if getattr(user, 'is_superuser', False) or getattr(user, 'is_staff', False):
+                resolved_role = 'admin'
+            else:
+                resolved_role = role_mapping.get(getattr(user, 'user_type', 3), 'customer')
             
             # Get user type display info
             user_type_info = AuthService.get_user_type_display_info(user.user_type)
@@ -284,11 +359,52 @@ class UserLoginView(APIView):
                     'email': user.email,
                     'first_name': user.first_name or '',
                     'last_name': user.last_name or '',
-                    'role': role_mapping.get(user.user_type, 'customer'),
+                    'role': resolved_role,
                     'is_verified': user.is_verified
                 },
                 'user_type_info': user_type_info
             }
+            
+            # Check for new device login and send notification
+            try:
+                user_agent = request.META.get('HTTP_USER_AGENT', 'Unknown')
+                ip_address = request.META.get('HTTP_X_FORWARDED_FOR', request.META.get('REMOTE_ADDR', 'Unknown'))
+                if ',' in ip_address:
+                    ip_address = ip_address.split(',')[0].strip()
+                
+                # Check if this is a new device (simplified check using AuthLog if it exists)
+                from accounts.models import AuthLog
+                recent_logins = AuthLog.objects.filter(
+                    user=user,
+                    action='login',
+                    ip_address=ip_address
+                ).exists()
+                
+                if not recent_logins:
+                    # This appears to be a new device/location
+                    NotificationService.create_notification(
+                        user=user,
+                        title="New Device Login",
+                        message=f"Your account was accessed from a new device or location. IP: {ip_address[:20]}... If this wasn't you, please secure your account immediately.",
+                        level='security',
+                        notification_type='security_login_from_new_device',
+                        metadata={
+                            'ip_address': ip_address,
+                            'user_agent': user_agent[:100] if user_agent else 'Unknown',
+                            'login_time': timezone.now().isoformat()
+                        }
+                    )
+                
+                # Log this login attempt
+                AuthLog.objects.create(
+                    user=user,
+                    action='login',
+                    ip_address=ip_address,
+                    user_agent=user_agent[:500] if user_agent else '',
+                    success=True
+                )
+            except Exception as e:
+                logger.warning(f"Failed to check/log new device login: {e}")
             
             print("DEBUG: Login successful")
             return Response(response_data, status=200)

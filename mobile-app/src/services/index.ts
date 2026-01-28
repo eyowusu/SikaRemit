@@ -15,9 +15,8 @@ export * as authService from './authService';
 export * as paymentService from './paymentService';
 
 // Payment Gateways
-export { default as stripeService } from './stripeService';
-export { default as paymentGateway, setActiveProvider, getActiveProvider } from './paymentGateway';
-export type { PaymentProvider, MobileMoneyProvider, PaymentInitResponse, PaymentVerifyResponse, SavedCard } from './paymentGateway';
+export { default as paymentGateway } from './paymentGateway';
+export type { PaymentMethod, MobileMoneyProvider, PaymentInitResponse, PaymentVerifyResponse, MobileMoneyInitResponse } from './paymentGateway';
 
 // Mobile Money
 export { default as mobileMoneyService } from './mobileMoneyService';

@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 import { getExchangeRates, getCurrencies } from '@/lib/api/currency'
+import { useAuth } from '@/lib/auth/context'
 
 export type Currency = string // Currency code like 'GHS', 'USD', etc.
 
@@ -27,6 +28,7 @@ const CurrencyContext = createContext<CurrencyContextType | undefined>(undefined
 const DEFAULT_CURRENCY: Currency = 'GHS'
 
 export function CurrencyProvider({ children }: { children: ReactNode }) {
+  const { user, loading: authLoading } = useAuth()
   const [currency, setCurrency] = useState<Currency>('GHS') // Start with GHS as default
   const [availableCurrencies, setAvailableCurrencies] = useState<Currency[]>([])
   const [exchangeRates, setExchangeRates] = useState<Record<string, number>>({})
@@ -36,8 +38,8 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
 
   // Load currencies and exchange rates on mount
   useEffect(() => {
-    // Skip on server-side rendering
-    if (typeof window === 'undefined') return
+    // Skip on server-side rendering or if auth is still loading
+    if (typeof window === 'undefined' || authLoading) return
 
     // Skip if currencies already loaded (prevents rate limiting)
     if (availableCurrencies.length > 0) return
@@ -57,6 +59,17 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
         const ratesWithBase = { ...response.rates, [baseCurrency]: 1.0 }
         setExchangeRates(ratesWithBase)
         setLastRateUpdate(new Date())
+
+        // Apply custom merchant rates if available
+        const customRatesStr = localStorage.getItem('merchant-currency-rates')
+        if (customRatesStr) {
+          try {
+            const customRates = JSON.parse(customRatesStr)
+            setExchangeRates(prev => ({ ...prev, ...customRates }))
+          } catch (error) {
+            console.error('Failed to apply custom rates:', error)
+          }
+        }
       } catch (error: any) {
         if (error?.response?.status === 429) {
           console.warn('Currency API rate limited, will retry later')
@@ -70,7 +83,7 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
       }
     }
     loadData()
-  }, []) // Empty dependency array to run only once
+  }, [authLoading, availableCurrencies.length, baseCurrency]) // Add authLoading dependency
 
   const convertAmount = (amount: number, fromCurrency: Currency, toCurrency: Currency): number => {
     if (fromCurrency === toCurrency) return amount

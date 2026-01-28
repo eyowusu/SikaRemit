@@ -166,6 +166,116 @@ class NotificationService:
         return notifications
 
     @classmethod
+    def notify_admins(cls, title, message, level='info', notification_type=None, metadata=None):
+        """
+        Send notification to all admin users.
+        Used for system events like KYC submissions, failed transactions, security alerts.
+        """
+        from django.contrib.auth import get_user_model
+        from django.db.models import Q
+        
+        User = get_user_model()
+        # Get all admin users (user_type=1 OR is_staff=True OR is_superuser=True)
+        admin_users = User.objects.filter(
+            Q(user_type=1) | Q(is_staff=True) | Q(is_superuser=True),
+            is_active=True
+        ).distinct()
+        
+        notifications = []
+        for admin in admin_users:
+            notification = cls.create_notification(
+                user=admin,
+                title=title,
+                message=message,
+                level=level,
+                notification_type=notification_type,
+                metadata=metadata
+            )
+            notifications.append(notification)
+        
+        logger.info(f"Sent admin notification '{title}' to {len(notifications)} admins")
+        return notifications
+
+    @classmethod
+    def notify_kyc_submission(cls, customer, document_type):
+        """Notify admins when a new KYC document is submitted"""
+        return cls.notify_admins(
+            title="New KYC Submission",
+            message=f"Customer {customer.user.email} submitted {document_type} for verification.",
+            level='info',
+            notification_type='kyc_submitted',
+            metadata={
+                'customer_id': customer.id,
+                'customer_email': customer.user.email,
+                'document_type': document_type
+            }
+        )
+
+    @classmethod
+    def notify_failed_transaction(cls, transaction):
+        """Notify admins about failed transactions"""
+        return cls.notify_admins(
+            title="Transaction Failed",
+            message=f"Transaction #{transaction.id} failed. Amount: {transaction.amount} {transaction.currency}",
+            level='warning',
+            notification_type='payment_failed',
+            metadata={
+                'transaction_id': transaction.id,
+                'amount': str(transaction.amount),
+                'currency': transaction.currency
+            }
+        )
+
+    @classmethod
+    def notify_suspicious_activity(cls, user, activity_type, details):
+        """Notify admins about suspicious activity"""
+        return cls.notify_admins(
+            title="Suspicious Activity Detected",
+            message=f"Suspicious {activity_type} detected for user {user.email}. {details}",
+            level='security',
+            notification_type='security_suspicious_activity',
+            metadata={
+                'user_id': user.id,
+                'user_email': user.email,
+                'activity_type': activity_type,
+                'details': details
+            }
+        )
+
+    @classmethod
+    def notify_new_merchant_application(cls, merchant):
+        """Notify admins when a new merchant applies"""
+        return cls.notify_admins(
+            title="New Merchant Application",
+            message=f"New merchant application from {merchant.business_name} ({merchant.user.email}).",
+            level='info',
+            notification_type='merchant_application_submitted',
+            metadata={
+                'merchant_id': merchant.id,
+                'business_name': merchant.business_name,
+                'user_email': merchant.user.email
+            }
+        )
+
+    @classmethod  
+    def notify_large_transaction(cls, transaction, threshold=10000):
+        """Notify admins about large transactions"""
+        if float(transaction.amount) >= threshold:
+            return cls.notify_admins(
+                title="Large Transaction Alert",
+                message=f"Large transaction detected: {transaction.amount} {transaction.currency}",
+                level='warning',
+                notification_type='payment_pending',
+                metadata={
+                    'transaction_id': transaction.id,
+                    'amount': str(transaction.amount),
+                    'currency': transaction.currency,
+                    'threshold': threshold
+                }
+            )
+        return []
+
+    @classmethod
     def deliver_with_retry(cls, notification, max_attempts=3):
         if notification.delivery_attempts >= max_attempts:
             return False

@@ -13,6 +13,19 @@ from rest_framework_simplejwt.views import (
     TokenRefreshView,
 )
 from drf_spectacular.views import SpectacularAPIView, SpectacularRedocView, SpectacularSwaggerView
+from core.api.views import AuditLogAPIView
+from rest_framework.routers import DefaultRouter
+from payments.views.webhook_views import WebhookViewSet, WebhookEventViewSet
+from accounts.admin_reports import AdminReportViewSet, get_admin_report_stats, generate_admin_report
+
+# Webhook router
+webhook_router = DefaultRouter()
+webhook_router.register(r'webhooks', WebhookViewSet, basename='webhooks')
+webhook_router.register(r'webhook-events', WebhookEventViewSet, basename='webhook-events')
+
+# Admin reports router
+admin_router = DefaultRouter()
+admin_router.register(r'reports', AdminReportViewSet, basename='admin-reports')
 
 def simple_health_check(request):
     return JsonResponse({'status': 'healthy', 'message': 'Backend is running'})
@@ -49,13 +62,12 @@ urlpatterns = [
     # Health Check
     path('health/', simple_health_check, name='health-check'),
     path('api/v1/health/', simple_health_check, name='api-health-check'),
-    
-    # Simple API endpoints (keep login at root level for compatibility)
-    path('api/v1/accounts/login/', MyTokenObtainPairView.as_view(), name='token_obtain_pair'),
-    path('api/v1/accounts/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
-    
+
     # Accounts API (includes customers, support tickets, etc.)
     path('api/v1/accounts/', include('accounts.urls')),
+    
+    # Users API (merchants, customers, KYC)
+    path('api/v1/users/', include('users.urls')),
     
     # Payments API
     path('api/v1/payments/', include('payments.urls')),
@@ -68,6 +80,19 @@ urlpatterns = [
     
     # KYC API
     path('api/v1/kyc/', include('kyc.urls')),
+    
+    # Dashboard/Admin API
+    path('api/v1/dashboard/', include('dashboard.urls')),
+    path('api/v1/admin/', include('dashboard.urls')),
+    path('api/v1/admin/merchants/', include('merchants.urls')),  # Admin merchant management
+    path('api/v1/admin/ussd/', include('ussd.urls')),  # Admin USSD management
+    path('api/v1/admin/', include(webhook_router.urls)),  # Admin webhooks management
+    path('api/admin/reports/stats/', get_admin_report_stats, name='admin-report-stats'),
+    path('api/admin/reports/generate/', generate_admin_report, name='admin-report-generate'),
+    path('api/admin/', include(admin_router.urls)),  # Admin reports
+    
+    # Audit Logs API
+    path('api/audit-logs/', AuditLogAPIView.as_view(), name='audit-logs'),
     
     # API Documentation
     path('api/schema/', SpectacularAPIView.as_view(permission_classes=[]), name='schema'),

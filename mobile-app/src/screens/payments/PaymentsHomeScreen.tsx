@@ -5,14 +5,36 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  Dimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import Animated, { FadeInDown } from 'react-native-reanimated';
+import { LinearGradient } from 'expo-linear-gradient';
+import * as Haptics from 'expo-haptics';
+import Animated, { 
+  FadeInDown, 
+  FadeInUp,
+  FadeInRight,
+  useSharedValue, 
+  useAnimatedStyle, 
+  withSpring,
+  interpolate,
+  Extrapolation,
+} from 'react-native-reanimated';
 import { Card } from '../../components/ui';
 import { useTheme } from '../../context/ThemeContext';
-import { BorderRadius, FontSize, FontWeight, Spacing } from '../../constants/theme';
+import { 
+  BorderRadius, 
+  FontSize, 
+  FontWeight, 
+  Spacing, 
+  Shadow, 
+  AnimationConfig, 
+  ComponentSize 
+} from '../../constants/theme';
+
+const { width } = Dimensions.get('window');
 
 const PaymentsHomeScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
@@ -25,40 +47,45 @@ const PaymentsHomeScreen: React.FC = () => {
       title: 'Deposit',
       description: 'Top up your wallet',
       icon: 'add-circle',
-      color: '#10B981',
+      color: colors.success,
       screen: 'Deposit',
+      gradient: colors.gradient.success,
     },
     {
       id: 'send',
       title: 'Send Locally',
       description: 'Domestic transfer to friends and family',
       icon: 'send',
-      color: '#7C3AED',
+      color: colors.primary,
       screen: 'SendMoney',
+      gradient: colors.gradient.primary,
     },
     {
       id: 'request',
       title: 'Request Money',
       description: 'Request payment from others',
       icon: 'download',
-      color: '#EC4899',
+      color: colors.accent,
       screen: 'RequestMoney',
+      gradient: colors.gradient.primary,
     },
     {
       id: 'bills',
       title: 'Pay Bills',
       description: 'Utilities, subscriptions, and more',
       icon: 'receipt',
-      color: '#06B6D4',
+      color: colors.warning,
       screen: 'BillPayment',
+      gradient: colors.gradient.warning,
     },
     {
       id: 'remittance',
       title: 'International Transfer',
       description: 'Send money across borders',
       icon: 'globe',
-      color: '#10B981',
+      color: colors.secondary,
       screen: 'Remittance',
+      gradient: colors.gradient.secondary,
     },
     {
       id: 'airtime',
@@ -67,6 +94,7 @@ const PaymentsHomeScreen: React.FC = () => {
       icon: 'phone-portrait',
       color: '#F59E0B',
       screen: 'Airtime',
+      gradient: ['#F59E0B', '#F97316'],
     },
     {
       id: 'data',
@@ -75,6 +103,7 @@ const PaymentsHomeScreen: React.FC = () => {
       icon: 'cellular',
       color: '#06B6D4',
       screen: 'DataBundle',
+      gradient: ['#06B6D4', '#3B82F6'],
     },
     {
       id: 'qr',
@@ -83,6 +112,7 @@ const PaymentsHomeScreen: React.FC = () => {
       icon: 'qr-code',
       color: '#8B5CF6',
       screen: 'QRScanner',
+      gradient: ['#8B5CF6', '#6366F1'],
     },
   ];
 
@@ -92,86 +122,236 @@ const PaymentsHomeScreen: React.FC = () => {
     { id: 'airteltigo', name: 'AirtelTigo', color: '#FF0000' },
   ];
 
-  return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <ScrollView
-        contentContainerStyle={[styles.content, { paddingTop: insets.top + Spacing.md }]}
-        showsVerticalScrollIndicator={false}
-      >
-        <Animated.View entering={FadeInDown.delay(100).duration(600)}>
-          <Text style={[styles.title, { color: colors.text }]}>Payments</Text>
-          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-            Choose a payment option to get started
-          </Text>
-        </Animated.View>
+  const recentTransactions = [
+    {
+      id: '1',
+      type: 'deposit',
+      amount: 500,
+      recipient: 'John Doe',
+      date: '2 hours ago',
+      icon: 'arrow-down-circle',
+      color: colors.success,
+    },
+    {
+      id: '2',
+      type: 'send',
+      amount: 200,
+      recipient: 'Jane Smith',
+      date: '5 hours ago',
+      icon: 'arrow-up-circle',
+      color: colors.primary,
+    },
+    {
+      id: '3',
+      type: 'bill',
+      amount: 150,
+      recipient: 'Electricity Company',
+      date: '1 day ago',
+      icon: 'receipt',
+      color: colors.warning,
+    },
+  ];
 
-        {/* Payment Options Grid */}
-        <Animated.View entering={FadeInDown.delay(200).duration(600)} style={styles.grid}>
-          {paymentOptions.map((option, index) => (
-            <TouchableOpacity
-              key={option.id}
-              style={[styles.optionCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
-              onPress={() => navigation.navigate(option.screen)}
-            >
-              <View style={[styles.optionIcon, { backgroundColor: option.color + '15' }]}>
-                <Ionicons name={option.icon as any} size={28} color={option.color} />
+  const handlePaymentPress = (option: any) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    navigation.navigate(option.screen as any);
+  };
+
+  const renderPaymentOption = (option: any, index: number) => (
+    <Animated.View
+      key={option.id}
+      entering={FadeInUp.duration(400).delay(index * 100)}
+      style={styles.paymentOption}
+    >
+      <TouchableOpacity
+        style={styles.paymentTouchable}
+        onPress={() => handlePaymentPress(option)}
+        activeOpacity={0.8}
+      >
+        <Card variant="gradient" padding="lg" style={styles.paymentCard}>
+          <LinearGradient
+            colors={option.gradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.paymentGradient}
+          >
+            <View style={styles.paymentHeader}>
+              <View style={[
+                styles.paymentIcon,
+                { backgroundColor: 'rgba(255, 255, 255, 0.2)' }
+              ]}>
+                <Ionicons name={option.icon as any} size={28} color="#FFFFFF" />
               </View>
-              <Text style={[styles.optionTitle, { color: colors.text }]}>{option.title}</Text>
-              <Text style={[styles.optionDescription, { color: colors.textMuted }]}>
-                {option.description}
+              <View style={styles.paymentContent}>
+                <Text style={styles.paymentTitle}>{option.title}</Text>
+                <Text style={styles.paymentDescription}>{option.description}</Text>
+              </View>
+              <View style={styles.paymentArrow}>
+                <Ionicons name="chevron-forward" size={20} color="rgba(255, 255, 255, 0.8)" />
+              </View>
+            </View>
+          </LinearGradient>
+        </Card>
+      </TouchableOpacity>
+    </Animated.View>
+  );
+
+  const renderMobileMoneySection = () => (
+    <Animated.View entering={FadeInUp.duration(800).delay(600)} style={styles.section}>
+      <Text style={[styles.sectionTitle, { color: colors.text }]}>Mobile Money</Text>
+      <View style={styles.mobileMoneyContainer}>
+        {mobileMoneyProviders.map((provider, index) => (
+          <Animated.View
+            key={provider.id}
+            entering={FadeInRight.duration(400).delay(index * 100)}
+            style={styles.providerItem}
+          >
+            <TouchableOpacity
+              style={[
+                styles.providerTouchable,
+                { backgroundColor: provider.color + '20' }
+              ]}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                // Navigate to mobile money provider selection
+              }}
+              activeOpacity={0.8}
+            >
+              <View style={[
+                styles.providerIcon,
+                { backgroundColor: provider.color }
+              ]}>
+                <Text style={styles.providerInitial}>
+                  {provider.name.charAt(0)}
+                </Text>
+              </View>
+              <Text style={[styles.providerName, { color: colors.text }]}>
+                {provider.name}
               </Text>
             </TouchableOpacity>
-          ))}
+          </Animated.View>
+        ))}
+      </View>
+    </Animated.View>
+  );
+
+  const renderRecentTransactions = () => (
+    <Animated.View entering={FadeInUp.duration(800).delay(800)} style={styles.section}>
+      <Text style={[styles.sectionTitle, { color: colors.text }]}>Recent Activity</Text>
+      <Card variant="default" padding="lg" style={styles.recentCard}>
+        {recentTransactions.map((transaction, index) => (
+          <View key={transaction.id} style={styles.transactionItem}>
+            <View style={[
+              styles.transactionIcon,
+              { backgroundColor: transaction.color + '20' }
+            ]}>
+              <Ionicons name={transaction.icon as any} size={20} color={transaction.color} />
+            </View>
+            <View style={styles.transactionContent}>
+              <Text style={[styles.transactionTitle, { color: colors.text }]}>
+                {transaction.type === 'deposit' ? 'Received' : 'Sent'} GHS {transaction.amount}
+              </Text>
+              <Text style={[styles.transactionRecipient, { color: colors.textSecondary }]}>
+                {transaction.recipient}
+              </Text>
+              <Text style={[styles.transactionDate, { color: colors.textMuted }]}>
+                {transaction.date}
+              </Text>
+            </View>
+          </View>
+        ))}
+      </Card>
+    </Animated.View>
+  );
+
+  const renderQuickActions = () => (
+    <Animated.View entering={FadeInUp.duration(800).delay(1000)} style={styles.section}>
+      <Text style={[styles.sectionTitle, { color: colors.text }]}>Quick Actions</Text>
+      <View style={styles.quickActionsContainer}>
+        <TouchableOpacity
+          style={[
+            styles.quickAction,
+            { backgroundColor: colors.primary + '15' }
+          ]}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            navigation.navigate('SendMoney');
+          }}
+        >
+          <Ionicons name="send" size={24} color={colors.primary} />
+          <Text style={[styles.quickActionText, { color: colors.primary }]}>
+            Quick Send
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            styles.quickAction,
+            { backgroundColor: colors.success + '15' }
+          ]}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            navigation.navigate('Deposit');
+          }}
+        >
+          <Ionicons name="add-circle" size={24} color={colors.success} />
+          <Text style={[styles.quickActionText, { color: colors.success }]}>
+            Quick Deposit
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            styles.quickAction,
+            { backgroundColor: colors.accent + '15' }
+          ]}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            navigation.navigate('Airtime');
+          }}
+        >
+          <Ionicons name="phone-portrait" size={24} color={colors.accent} />
+          <Text style={[styles.quickActionText, { color: colors.accent }]}>
+            Buy Airtime
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </Animated.View>
+  );
+
+  return (
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      {/* Header */}
+      <Animated.View entering={FadeInDown.duration(600)} style={styles.header}>
+        <View style={[styles.headerContent, { paddingTop: insets.top + Spacing.lg }]}>
+          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+            <Ionicons name="arrow-back" size={24} color={colors.text} />
+          </TouchableOpacity>
+          <Text style={[styles.title, { color: colors.text }]}>Payments</Text>
+          <View style={styles.placeholder} />
+        </View>
+      </Animated.View>
+
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Payment Options */}
+        <Animated.View entering={FadeInUp.duration(800).delay(200)} style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Payment Options</Text>
+          <View style={styles.paymentGrid}>
+            {paymentOptions.map((option, index) => renderPaymentOption(option, index))}
+          </View>
         </Animated.View>
 
         {/* Mobile Money Section */}
-        <Animated.View entering={FadeInDown.delay(300).duration(600)} style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Mobile Money</Text>
-          <Card padding="sm">
-            {mobileMoneyProviders.map((provider, index) => (
-              <TouchableOpacity
-                key={provider.id}
-                style={[
-                  styles.providerItem,
-                  index < mobileMoneyProviders.length - 1 && {
-                    borderBottomWidth: 1,
-                    borderBottomColor: colors.divider,
-                  },
-                ]}
-              >
-                <View style={[styles.providerLogo, { backgroundColor: provider.color }]}>
-                  <Text style={styles.providerLogoText}>{provider.name.charAt(0)}</Text>
-                </View>
-                <Text style={[styles.providerName, { color: colors.text }]}>{provider.name}</Text>
-                <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
-              </TouchableOpacity>
-            ))}
-          </Card>
-        </Animated.View>
+        {renderMobileMoneySection()}
 
-        {/* Recent Recipients - Add New Button Only */}
-        <Animated.View entering={FadeInDown.delay(400).duration(600)} style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>Quick Send</Text>
-          </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            <TouchableOpacity style={styles.recipientItem}>
-              <View
-                style={[
-                  styles.recipientAvatar,
-                  { backgroundColor: colors.primary + '15' },
-                ]}
-              >
-                <Ionicons name="add" size={24} color={colors.primary} />
-              </View>
-              <Text style={[styles.recipientName, { color: colors.primary }]}>
-                Add New
-              </Text>
-            </TouchableOpacity>
-          </ScrollView>
-        </Animated.View>
+        {/* Recent Transactions */}
+        {renderRecentTransactions()}
 
-        <View style={{ height: 100 }} />
+        {/* Quick Actions */}
+        {renderQuickActions()}
+
+        <View style={{ height: Spacing.xxxl }} />
       </ScrollView>
     </View>
   );
@@ -181,109 +361,171 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  content: {
+  header: {
+    marginBottom: Spacing.lg,
+  },
+  headerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: Spacing.lg,
   },
-  title: {
-    fontSize: FontSize.xxxl,
-    fontWeight: FontWeight.bold,
-    marginBottom: Spacing.xs,
-  },
-  subtitle: {
-    fontSize: FontSize.md,
-    marginBottom: Spacing.lg,
-  },
-  grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    marginBottom: Spacing.lg,
-  },
-  optionCard: {
-    width: '48%',
-    padding: Spacing.md,
-    borderRadius: BorderRadius.lg,
-    borderWidth: 1,
-    marginBottom: Spacing.md,
-  },
-  optionIcon: {
-    width: 52,
-    height: 52,
-    borderRadius: 14,
-    justifyContent: 'center',
+  backButton: {
+    width: ComponentSize.iconButton.md,
+    height: ComponentSize.iconButton.md,
+    borderRadius: BorderRadius.full,
     alignItems: 'center',
-    marginBottom: Spacing.sm,
+    justifyContent: 'center',
   },
-  optionTitle: {
-    fontSize: FontSize.md,
-    fontWeight: FontWeight.semibold,
-    marginBottom: 4,
+  title: {
+    fontSize: FontSize.xxl,
+    fontWeight: FontWeight.bold as any,
   },
-  optionDescription: {
-    fontSize: FontSize.xs,
-    lineHeight: 16,
+  placeholder: {
+    width: ComponentSize.iconButton.md,
+  },
+  content: {
+    paddingBottom: Spacing.xxl,
   },
   section: {
-    marginBottom: Spacing.lg,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: Spacing.md,
+    marginBottom: Spacing.xl,
   },
   sectionTitle: {
     fontSize: FontSize.lg,
-    fontWeight: FontWeight.semibold,
+    fontWeight: FontWeight.semibold as any,
+    marginBottom: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+  },
+  paymentGrid: {
+    gap: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+  },
+  paymentOption: {
     marginBottom: Spacing.md,
   },
-  seeAll: {
-    fontSize: FontSize.sm,
-    fontWeight: FontWeight.medium,
+  paymentTouchable: {
+    borderRadius: BorderRadius.lg,
   },
-  providerItem: {
+  paymentCard: {
+    ...Shadow.card,
+  },
+  paymentGradient: {
+    borderRadius: BorderRadius.lg,
+    overflow: 'hidden',
+  },
+  paymentHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: Spacing.md,
-    paddingHorizontal: Spacing.sm,
+    padding: Spacing.lg,
   },
-  providerLogo: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    justifyContent: 'center',
+  paymentIcon: {
+    width: ComponentSize.avatar.lg,
+    height: ComponentSize.avatar.lg,
+    borderRadius: BorderRadius.md,
     alignItems: 'center',
+    justifyContent: 'center',
     marginRight: Spacing.md,
   },
-  providerLogoText: {
+  paymentContent: {
+    flex: 1,
+  },
+  paymentTitle: {
     fontSize: FontSize.lg,
-    fontWeight: FontWeight.bold,
+    fontWeight: FontWeight.semibold as any,
+    color: '#FFFFFF',
+    marginBottom: Spacing.xs,
+  },
+  paymentDescription: {
+    fontSize: FontSize.sm,
+    color: 'rgba(255,255,255,0.9)',
+  },
+  paymentArrow: {
+    alignItems: 'center',
+  },
+  mobileMoneyContainer: {
+    flexDirection: 'row',
+    gap: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+  },
+  providerItem: {
+    flex: 1,
+  },
+  providerTouchable: {
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  providerIcon: {
+    width: ComponentSize.avatar.lg,
+    height: ComponentSize.avatar.lg,
+    borderRadius: BorderRadius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: Spacing.md,
+  },
+  providerInitial: {
+    fontSize: FontSize.lg,
+    fontWeight: FontWeight.bold as any,
     color: '#FFFFFF',
   },
   providerName: {
-    flex: 1,
-    fontSize: FontSize.md,
-    fontWeight: FontWeight.medium,
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.semibold as any,
   },
-  recipientItem: {
+  recentCard: {
+    ...Shadow.card,
+    marginHorizontal: Spacing.lg,
+  },
+  transactionItem: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginRight: Spacing.lg,
+    marginBottom: Spacing.md,
+    paddingBottom: Spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
   },
-  recipientAvatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+  transactionIcon: {
+    width: ComponentSize.avatar.md,
+    height: ComponentSize.avatar.md,
+    borderRadius: BorderRadius.md,
+    alignItems: 'center',
     justifyContent: 'center',
-    alignItems: 'center',
+    marginRight: Spacing.md,
+  },
+  transactionContent: {
+    flex: 1,
+  },
+  transactionTitle: {
+    fontSize: FontSize.md,
+    fontWeight: FontWeight.semibold as any,
     marginBottom: Spacing.xs,
   },
-  recipientInitial: {
-    fontSize: FontSize.xl,
-    fontWeight: FontWeight.semibold,
+  transactionRecipient: {
+    fontSize: FontSize.sm,
+    marginBottom: Spacing.xs,
   },
-  recipientName: {
+  transactionDate: {
     fontSize: FontSize.xs,
-    fontWeight: FontWeight.medium,
+  },
+  quickActionsContainer: {
+    flexDirection: 'row',
+    gap: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+  },
+  quickAction: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.lg,
+    gap: Spacing.sm,
+  },
+  quickActionText: {
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.semibold as any,
+    marginLeft: Spacing.sm,
   },
 });
 

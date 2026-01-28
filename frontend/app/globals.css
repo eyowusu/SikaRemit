@@ -2,6 +2,28 @@
 
 /* SikaRemit - Revolut-Inspired Professional Design System */
 
+/* Date Picker Overrides - Simple approach */
+[data-radix-popper-content-wrapper] {
+  z-index: 1000 !important;
+}
+
+/* Force solid background for date picker */
+[data-radix-popper-content-wrapper] *,
+[data-radix-popper-content-wrapper] > * {
+  background-color: white !important;
+  background: white !important;
+  background-image: none !important;
+}
+
+/* Extra force for calendar container */
+[data-radix-popper-content-wrapper] div,
+[data-radix-popper-content-wrapper] [role="grid"],
+[data-radix-popper-content-wrapper] table {
+  background-color: white !important;
+  background: white !important;
+  background-image: none !important;
+}
+
 :root {
   /* Revolut Brand Colors */
   --revolut-blue: #0047FF;
@@ -60,33 +82,33 @@
 }
 
 .dark {
-  --background: 220 13% 4%;
+  --background: 220 13% 3%;
   --foreground: 0 0% 98%;
-  --card: 220 13% 6%;
+  --card: 220 13% 8%;
   --card-foreground: 0 0% 98%;
-  --popover: 220 13% 6%;
+  --popover: 220 13% 8%;
   --popover-foreground: 0 0% 98%;
-  --primary: 217 100% 60%;
+  --primary: 217 100% 65%;
   --primary-foreground: 0 0% 100%;
-  --secondary: 220 5% 15%;
+  --secondary: 220 5% 20%;
   --secondary-foreground: 0 0% 98%;
-  --muted: 220 5% 15%;
-  --muted-foreground: 220 5% 65%;
-  --accent: 220 5% 15%;
+  --muted: 220 5% 20%;
+  --muted-foreground: 220 5% 75%;
+  --accent: 220 5% 20%;
   --accent-foreground: 0 0% 98%;
-  --destructive: 0 62.8% 50%;
+  --destructive: 0 62.8% 55%;
   --destructive-foreground: 0 0% 100%;
-  --border: 220 5% 18%;
-  --input: 220 5% 18%;
-  --ring: 217 100% 60%;
+  --border: 220 5% 25%;
+  --input: 220 5% 25%;
+  --ring: 217 100% 65%;
   
   /* Dark mode Revolut variables */
   --revolut-background: var(--revolut-dark-gray);
-  --revolut-surface: var(--revolut-black);
+  --revolut-surface: #0A0B0D;
   --revolut-border: #2A2D32;
-  --revolut-shadow: rgba(255, 255, 255, 0.05);
-  --revolut-shadow-hover: rgba(255, 255, 255, 0.08);
-  --revolut-shadow-active: rgba(255, 255, 255, 0.12);
+  --revolut-shadow: rgba(255, 255, 255, 0.08);
+  --revolut-shadow-hover: rgba(255, 255, 255, 0.12);
+  --revolut-shadow-active: rgba(255, 255, 255, 0.16);
 }
 
 * {
@@ -140,15 +162,16 @@ body {
 }
 
 .revolut-glass {
-  background-color: rgba(255, 255, 255, 0.8);
-  backdrop-filter: blur(24px);
+  background-color: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(8px);
   border-radius: 16px;
-  border: 1px solid rgba(243, 244, 246, 0.3);
+  border: 1px solid rgba(243, 244, 246, 0.5);
 }
 
 .dark .revolut-glass {
-  background-color: rgba(26, 27, 30, 0.8);
-  border-color: rgba(42, 45, 50, 0.3);
+  background-color: rgba(26, 27, 30, 0.95);
+  backdrop-filter: blur(4px);
+  border-color: rgba(42, 45, 50, 0.8);
 }
 
 .revolut-btn {
@@ -394,13 +417,13 @@ body {
   z-index: 50;
   width: 100%;
   border-bottom: 1px solid var(--revolut-border);
-  background-color: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(24px);
+  background-color: rgba(255, 255, 255, 0.98);
+  backdrop-filter: blur(4px);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .dark .revolut-nav {
-  background-color: rgba(26, 27, 30, 0.95);
+  background-color: rgba(26, 27, 30, 0.98);
   border-color: var(--revolut-border);
 }
 
@@ -747,4 +770,40 @@ body {
 @keyframes pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.5; }
+}
+
+/* Mobile-first improvements */
+@media (max-width: 640px) {
+  .revolut-container {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+  
+  .revolut-quick-action {
+    padding: 0.75rem;
+    min-height: 88px;
+  }
+  
+  .revolut-balance-card {
+    padding: 1rem;
+  }
+  
+  .revolut-card {
+    padding: 1rem;
+  }
+}
+
+/* Better dark mode glass effects */
+.dark .revolut-glass {
+  background-color: hsl(var(--card));
+  backdrop-filter: blur(2px);
+  border: 1px solid hsl(var(--border));
+}
+
+.dark .backdrop-blur-xl {
+  backdrop-filter: blur(2px) !important;
+}
+
+.dark .backdrop-blur-lg {
+  backdrop-filter: blur(1px) !important;
 }

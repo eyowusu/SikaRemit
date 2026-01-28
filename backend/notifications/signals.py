@@ -5,6 +5,13 @@ from users.models import Customer
 from .services import NotificationService
 from .realtime import RealtimeService
 from decimal import Decimal
+from django.conf import settings
+import logging
+
+logger = logging.getLogger(__name__)
+
+# Low balance threshold (in base currency)
+LOW_BALANCE_THRESHOLD = getattr(settings, 'LOW_BALANCE_THRESHOLD', Decimal('10.00'))
 
 @receiver(post_save, sender=Transaction)
 def create_transaction_notification(sender, instance, created, **kwargs):
@@ -79,6 +86,22 @@ def create_transaction_notification(sender, instance, created, **kwargs):
                     'transaction_type': transaction_type
                 }
             )
+
+            # Notify merchant when they receive a payment (if merchant exists)
+            if instance.merchant and instance.merchant.user:
+                NotificationService.create_notification(
+                    user=instance.merchant.user,
+                    title="Payment Received",
+                    message=f"You received a payment of {instance.amount} {instance.currency} from {instance.customer.user.email}",
+                    level='payment',
+                    notification_type='merchant_payment_received',
+                    metadata={
+                        'transaction_id': instance.id,
+                        'amount': str(instance.amount),
+                        'currency': instance.currency,
+                        'customer_email': instance.customer.user.email
+                    }
+                )
 
         elif instance.status == 'failed':
             # Handle failed transactions
@@ -190,3 +213,23 @@ def send_balance_updates(sender, instance, created, **kwargs):
                     }
                 }
             )
+
+            # Check for low balance and notify user
+            if instance.available_balance < LOW_BALANCE_THRESHOLD:
+                # Only notify if balance dropped below threshold (was above before)
+                if instance._old_available_balance >= LOW_BALANCE_THRESHOLD:
+                    try:
+                        NotificationService.create_notification(
+                            user=instance.user,
+                            title="Low Balance Alert",
+                            message=f"Your wallet balance is low ({instance.available_balance} {getattr(instance, 'currency', 'GHS')}). Please top up to continue making transactions.",
+                            level='warning',
+                            notification_type='wallet_low_balance',
+                            metadata={
+                                'current_balance': str(instance.available_balance),
+                                'threshold': str(LOW_BALANCE_THRESHOLD),
+                                'currency': getattr(instance, 'currency', 'GHS')
+                            }
+                        )
+                    except Exception as e:
+                        logger.error(f"Failed to send low balance notification: {e}")

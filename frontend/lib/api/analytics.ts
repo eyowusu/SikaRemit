@@ -33,7 +33,7 @@ export async function getAnalytics(params?: {
   end_date?: string
   store_id?: string
 }) {
-  const response = await axios.get(`${API_BASE_URL}/api/merchant/analytics/`, {
+  const response = await axios.get(`${API_BASE_URL}/api/v1/merchants/analytics/`, {
     headers: getAuthHeaders(),
     params
   })
@@ -45,7 +45,7 @@ export async function getRevenueChart(params?: {
   end_date?: string
   interval?: 'day' | 'week' | 'month'
 }) {
-  const response = await axios.get(`${API_BASE_URL}/api/merchant/analytics/revenue/`, {
+  const response = await axios.get(`${API_BASE_URL}/api/v1/merchants/analytics/revenue/`, {
     headers: getAuthHeaders(),
     params
   })
@@ -56,7 +56,7 @@ export async function getSalesMetrics(params?: {
   start_date?: string
   end_date?: string
 }) {
-  const response = await axios.get(`${API_BASE_URL}/api/merchant/analytics/sales/`, {
+  const response = await axios.get(`${API_BASE_URL}/api/v1/merchants/analytics/sales/`, {
     headers: getAuthHeaders(),
     params
   })

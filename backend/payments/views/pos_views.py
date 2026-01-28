@@ -45,11 +45,19 @@ class POSDeviceViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         """Filter devices by authenticated merchant"""
-        return POSDevice.objects.filter(merchant_id=self.request.user.merchant.id)
+        # Check if user has merchant profile
+        if not hasattr(self.request.user, 'merchant_profile'):
+            return POSDevice.objects.none()
+        
+        return POSDevice.objects.filter(merchant_id=self.request.user.merchant_profile.id)
 
     def perform_create(self, serializer):
         """Set merchant when creating device"""
-        serializer.save(merchant_id=self.request.user.merchant.id)
+        if hasattr(self.request.user, 'merchant_profile'):
+            serializer.save(merchant_id=self.request.user.merchant_profile.id)
+        else:
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError("Merchant profile required to create POS devices")
 
     @action(detail=True, methods=['post'])
     def activate(self, request, pk=None):
@@ -114,7 +122,11 @@ class POSTransactionViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         """Filter transactions by authenticated merchant"""
-        queryset = POSTransaction.objects.filter(merchant_id=self.request.user.merchant.id)
+        # Check if user has merchant profile
+        if not hasattr(self.request.user, 'merchant_profile'):
+            return POSTransaction.objects.none()
+        
+        queryset = POSTransaction.objects.filter(merchant_id=self.request.user.merchant_profile.id)
 
         # Filter by device if specified
         device_id = self.request.query_params.get('device_id')
@@ -183,11 +195,18 @@ def register_pos_device(request):
     """
     Register a new POS device for the authenticated merchant
     """
+    # Check if user has merchant profile
+    if not hasattr(request.user, 'merchant_profile'):
+        return Response(
+            {'error': 'Merchant profile not found'}, 
+            status=status.HTTP_404_NOT_FOUND
+        )
+    
     serializer = POSDeviceRegistrationSerializer(data=request.data)
     if not serializer.is_valid():
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    merchant_id = request.user.merchant.id
+    merchant_id = request.user.merchant_profile.id
     device_type = serializer.validated_data['device_type']
     device_name = serializer.validated_data['device_name']
     device_info = serializer.validated_data.get('device_info', {})
@@ -211,11 +230,18 @@ def process_pos_transaction(request):
     """
     Process a POS transaction through the specified device
     """
+    # Check if user has merchant profile
+    if not hasattr(request.user, 'merchant_profile'):
+        return Response(
+            {'error': 'Merchant profile not found'}, 
+            status=status.HTTP_404_NOT_FOUND
+        )
+    
     serializer = POSTransactionCreateSerializer(data=request.data)
     if not serializer.is_valid():
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    merchant_id = request.user.merchant.id
+    merchant_id = request.user.merchant_profile.id
     device_id = serializer.validated_data['device_id']
     device_type = serializer.validated_data['device_type']
     amount = serializer.validated_data['amount']
@@ -316,6 +342,13 @@ def generate_pos_receipt(request):
     """
     Generate a receipt for a POS transaction
     """
+    # Check if user has merchant profile
+    if not hasattr(request.user, 'merchant_profile'):
+        return Response(
+            {'error': 'Merchant profile not found'}, 
+            status=status.HTTP_404_NOT_FOUND
+        )
+    
     transaction_id = request.data.get('transaction_id')
     receipt_type = request.data.get('receipt_type', 'customer')
 
@@ -329,13 +362,13 @@ def generate_pos_receipt(request):
     transaction = get_object_or_404(
         POSTransaction,
         transaction_id=transaction_id,
-        merchant_id=request.user.merchant.id
+        merchant_id=request.user.merchant_profile.id
     )
 
     # Prepare transaction data for receipt
     transaction_data = {
         'transaction_id': transaction.transaction_id,
-        'merchant_name': request.user.merchant.business_name,
+        'merchant_name': request.user.merchant_profile.business_name,
         'amount': float(transaction.amount),
         'currency': transaction.currency,
         'card_last4': transaction.card_last4,
@@ -363,7 +396,14 @@ def get_pos_dashboard_data(request):
     """
     Get comprehensive POS dashboard data for merchant
     """
-    merchant_id = request.user.merchant.id
+    # Check if user has merchant profile
+    if not hasattr(request.user, 'merchant_profile'):
+        return Response(
+            {'error': 'Merchant profile not found'}, 
+            status=status.HTTP_404_NOT_FOUND
+        )
+    
+    merchant_id = request.user.merchant_profile.id
 
     # Device summary
     devices = POSDevice.objects.filter(merchant_id=merchant_id)

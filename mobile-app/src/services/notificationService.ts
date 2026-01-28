@@ -116,7 +116,7 @@ const notificationService = {
       }
 
       const token = await Notifications.getExpoPushTokenAsync({
-        projectId: 'your-expo-project-id', // Replace with actual project ID
+        projectId: process.env.EXPO_PROJECT_ID || 'your-expo-project-id', // Replace with actual project ID
       });
 
       return token.data;

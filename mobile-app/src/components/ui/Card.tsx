@@ -7,7 +7,7 @@ import { BorderRadius, Shadow, Spacing } from '../../constants/theme';
 interface CardProps {
   children: React.ReactNode;
   style?: ViewStyle;
-  variant?: 'default' | 'elevated' | 'outline' | 'gradient';
+  variant?: 'default' | 'elevated' | 'outline' | 'gradient' | 'glass';
   onPress?: () => void;
   padding?: 'none' | 'sm' | 'md' | 'lg' | 'xl';
 }
@@ -40,7 +40,7 @@ const Card: React.FC<CardProps> = ({
     switch (variant) {
       case 'elevated':
         return {
-          backgroundColor: colors.card,
+          backgroundColor: colors.surface,
           borderWidth: 0,
           ...Shadow.card,
         };
@@ -54,11 +54,17 @@ const Card: React.FC<CardProps> = ({
         return {
           borderWidth: 0,
         };
+      case 'glass':
+        return {
+          backgroundColor: 'rgba(255, 255, 255, 0.1)',
+          borderWidth: 1,
+          borderColor: 'rgba(255, 255, 255, 0.2)',
+        };
       default:
         return {
-          backgroundColor: colors.card,
+          backgroundColor: colors.surface,
           borderWidth: 1,
-          borderColor: colors.cardBorder,
+          borderColor: colors.borderLight,
         };
     }
   };
@@ -70,7 +76,7 @@ const Card: React.FC<CardProps> = ({
   };
 
   if (variant === 'gradient') {
-    const gradientColors = colors.gradient.balance || colors.gradient.primary;
+    const gradientColors = colors.gradient.primary;
     const content = (
       <LinearGradient
         colors={gradientColors as [string, string, ...string[]]}

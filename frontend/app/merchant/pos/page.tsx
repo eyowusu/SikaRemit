@@ -10,12 +10,13 @@ import DeviceManagement from './components/DeviceManagement'
 import TransactionProcessing from './components/TransactionProcessing'
 import TransactionHistory from './components/TransactionHistory'
 import POSDashboard from './components/POSDashboard'
+import api from '@/lib/api/axios'
 
 const POSPage = () => {
   const [activeTab, setActiveTab] = useState('dashboard')
-  const [devices, setDevices] = useState([])
-  const [transactions, setTransactions] = useState([])
-  const [dashboardData, setDashboardData] = useState(null)
+  const [devices, setDevices] = useState<any[]>([])
+  const [transactions, setTransactions] = useState<any[]>([])
+  const [dashboardData, setDashboardData] = useState<any | null>(null)
 
   useEffect(() => {
     fetchDashboardData()
@@ -24,15 +25,8 @@ const POSPage = () => {
 
   const fetchDashboardData = async () => {
     try {
-      const response = await fetch('/api/v1/payments/pos/dashboard/', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('access_token')}`
-        }
-      })
-      if (response.ok) {
-        const data = await response.json()
-        setDashboardData(data)
-      }
+      const response = await api.get('/api/v1/payments/pos/dashboard/')
+      setDashboardData(response.data)
     } catch (error) {
       console.error('Error fetching dashboard data:', error)
     }
@@ -40,15 +34,8 @@ const POSPage = () => {
 
   const fetchDevices = async () => {
     try {
-      const response = await fetch('/api/v1/payments/pos/devices/', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('access_token')}`
-        }
-      })
-      if (response.ok) {
-        const data = await response.json()
-        setDevices(data.results || data)
-      }
+      const response = await api.get('/api/v1/payments/pos/devices/')
+      setDevices(response.data.results || response.data)
     } catch (error) {
       console.error('Error fetching devices:', error)
     }

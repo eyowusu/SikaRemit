@@ -9,20 +9,40 @@ import {
   Platform,
   Image,
   Alert,
+  Dimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import Animated, { FadeInDown } from 'react-native-reanimated';
-import { Button, Input, Card, KYCRequiredModal } from '../../components/ui';
+import { LinearGradient } from 'expo-linear-gradient';
+import * as Haptics from 'expo-haptics';
 import { useTheme } from '../../context/ThemeContext';
+import Animated, { 
+  FadeInDown, 
+  FadeInUp,
+  FadeInRight,
+  useSharedValue, 
+  useAnimatedStyle, 
+  withSpring,
+} from 'react-native-reanimated';
+import { Button, Input, Card, KYCRequiredModal } from '../../components/ui';
 import { useAuthStore } from '../../store/authStore';
 import { useWalletStore } from '../../store/walletStore';
-import { BorderRadius, FontSize, FontWeight, Spacing } from '../../constants/theme';
+import { 
+  BorderRadius, 
+  FontSize, 
+  FontWeight, 
+  Spacing, 
+  Shadow, 
+  AnimationConfig, 
+  ComponentSize 
+} from '../../constants/theme';
 import { TelecomLogos } from '../../assets/logos';
 import { DEV_CONFIG } from '../../constants/api';
 import exchangeRateService, { ExchangeRate } from '../../services/exchangeRateService';
 import { paymentService } from '../../services/paymentService';
+
+const { width } = Dimensions.get('window');
 
 const RemittanceScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
@@ -64,6 +84,23 @@ const RemittanceScreen: React.FC = () => {
     fetchRate();
   }, [selectedCountry.currency]);
 
+  const countries = [
+    { code: 'US', name: 'United States', flag: '🇺🇸', currency: 'USD' },
+    { code: 'GB', name: 'United Kingdom', flag: '🇬🇧', currency: 'GBP' },
+    { code: 'EU', name: 'European Union', flag: '🇪🇺', currency: 'EUR' },
+    { code: 'NG', name: 'Nigeria', flag: '🇳🇬', currency: 'NGN' },
+    { code: 'KE', name: 'Kenya', flag: '🇰🇪', currency: 'KES' },
+  ];
+
+  const paymentMethods = [
+    { id: 'wallet', name: 'SikaRemit Balance', icon: 'wallet' },
+    { id: 'mtn_momo', name: 'MTN Mobile Money', icon: 'phone-portrait', color: '#FFCC00', logo: TelecomLogos.mtn },
+    { id: 'telecel_cash', name: 'Telecel Cash', icon: 'phone-portrait', color: '#E60000', logo: TelecomLogos.telecel },
+    { id: 'airteltigo_money', name: 'AirtelTigo Money', icon: 'phone-portrait', color: '#FF0000', logo: TelecomLogos.airteltigo },
+  ];
+
+  const quickAmounts = [50, 100, 200, 500, 1000, 2000];
+
   const handleContinue = async () => {
     // Check KYC before allowing remittance (bypassed in development mode)
     if (!DEV_CONFIG.BYPASS_KYC && user?.kyc_status !== 'approved') {
@@ -100,53 +137,61 @@ const RemittanceScreen: React.FC = () => {
         amount: amount,
         source_currency: 'GHS',
         target_currency: selectedCountry.currency,
-        exchange_rate: rate,
-        fee: fee,
         payment_method: selectedPaymentMethod,
       });
 
-      Alert.alert(
-        'Transfer Initiated',
-        `Your transfer of ${selectedCountry.currency} ${((amount - fee) * rate).toFixed(2)} to ${recipientName} has been initiated.`,
-        [{ text: 'OK', onPress: () => navigation.goBack() }]
-      );
+      // Navigate to confirmation screen
+      navigation.navigate('RemittanceConfirm', {
+        recipient: {
+          name: recipientName,
+          phone: recipientPhone,
+          country: selectedCountry,
+        },
+        amount: {
+          sendAmount: amount,
+          sendCurrency: 'GHS',
+          receiveAmount: (amount - fee) * rate,
+          receiveCurrency: selectedCountry.currency,
+          fee: fee,
+          rate: rate,
+        },
+        transactionId: response.id,
+      });
     } catch (error: any) {
-      Alert.alert('Error', error.response?.data?.message || 'Failed to initiate transfer');
+      Alert.alert('Error', error.response?.data?.message || 'Failed to process remittance');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const walletBalance = wallets.reduce((sum: number, w: { balance: number }) => sum + w.balance, 0);
+  const handleCountrySelect = (country: any) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setSelectedCountry(country);
+  };
 
-  const paymentMethods = [
-    { id: 'wallet', name: 'SikaRemit Balance', icon: 'wallet', balance: walletBalance },
-    { id: 'mtn_momo', name: 'MTN Mobile Money', icon: 'phone-portrait', color: '#FFCC00', logo: TelecomLogos.mtn },
-    { id: 'telecel_cash', name: 'Telecel Cash', icon: 'phone-portrait', color: '#E60000', logo: TelecomLogos.telecel },
-    { id: 'card', name: 'Debit/Credit Card', icon: 'card', color: '#3B82F6' },
-  ];
+  const handleQuickAmount = (value: number) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setSendAmount(value.toString());
+  };
 
-  // Get supported countries from exchange rate service currencies
-  const currencies = exchangeRateService.getCurrencies();
-  const countries = currencies
-    .filter(c => c.code !== 'GHS' && c.isActive)
-    .map(c => ({
-      code: c.code.substring(0, 2),
-      name: c.country,
-      flag: c.flag,
-      currency: c.code,
-    }));
+  const handlePaymentMethodSelect = (methodId: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setSelectedPaymentMethod(methodId);
+  };
 
-  // Calculate dynamic values
-  const currentRate = exchangeRate?.sellRate || exchangeRate?.rate || 0;
-  const fee = sendAmount ? exchangeRateService.calculateRemittanceFee(
-    parseFloat(sendAmount), 
-    'GHS', 
-    selectedCountry.currency
-  ) : 0;
-  const receiveAmount = sendAmount && currentRate 
-    ? ((parseFloat(sendAmount) - fee) * currentRate).toFixed(2) 
-    : '0.00';
+  const calculateReceiveAmount = () => {
+    if (!exchangeRate || !sendAmount) return 0;
+    const amount = parseFloat(sendAmount);
+    const fee = exchangeRateService.calculateRemittanceFee(amount, 'GHS', selectedCountry.currency);
+    const rate = exchangeRate.sellRate || exchangeRate.rate || 1;
+    return (amount - fee) * rate;
+  };
+
+  const calculateFee = () => {
+    if (!sendAmount) return 0;
+    const amount = parseFloat(sendAmount);
+    return exchangeRateService.calculateRemittanceFee(amount, 'GHS', selectedCountry.currency);
+  };
 
   return (
     <KeyboardAvoidingView
@@ -154,162 +199,219 @@ const RemittanceScreen: React.FC = () => {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <View style={[styles.header, { paddingTop: insets.top + Spacing.md }]}>
-          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-            <Ionicons name="arrow-back" size={24} color={colors.text} />
-          </TouchableOpacity>
-          <Text style={[styles.title, { color: colors.text }]}>International Transfer</Text>
-          <View style={{ width: 44 }} />
-        </View>
-
         <ScrollView
-          contentContainerStyle={styles.content}
-          keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
+          contentContainerStyle={[styles.contentContainer, { paddingTop: insets.top + Spacing.lg }]}
         >
-          <Animated.View entering={FadeInDown.delay(100).duration(600)}>
-            <Card style={styles.exchangeCard}>
-              <View style={styles.exchangeRow}>
-                <View style={styles.exchangeColumn}>
-                  <Text style={[styles.exchangeLabel, { color: colors.textSecondary }]}>You Send</Text>
-                  <View style={styles.amountRow}>
-                    <Text style={[styles.currencyCode, { color: colors.text }]}>GHS</Text>
-                    <Input
-                      placeholder="0.00"
-                      value={sendAmount}
-                      onChangeText={setSendAmount}
-                      keyboardType="decimal-pad"
-                      containerStyle={{ flex: 1, marginBottom: 0 }}
-                    />
-                  </View>
-                </View>
-              </View>
+          {/* Header */}
+          <Animated.View entering={FadeInDown.duration(600)} style={styles.header}>
+            <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+              <Ionicons name="arrow-back" size={24} color={colors.text} />
+            </TouchableOpacity>
+            <Text style={[styles.title, { color: colors.text }]}>Send Remittance</Text>
+            <View style={styles.placeholder} />
+          </Animated.View>
 
-              <View style={styles.exchangeIndicator}>
-                <View style={[styles.exchangeLine, { backgroundColor: colors.border }]} />
-                <View style={[styles.exchangeIcon, { backgroundColor: colors.primary }]}>
-                  <Ionicons name="swap-vertical" size={20} color="#FFFFFF" />
-                </View>
-                <View style={[styles.exchangeLine, { backgroundColor: colors.border }]} />
+          {/* Exchange Rate Card */}
+          <Animated.View entering={FadeInUp.duration(800).delay(200)} style={styles.section}>
+            <Card variant="default" padding="lg">
+              <View style={styles.exchangeHeader}>
+                <Text style={[styles.exchangeLabel, { color: colors.textSecondary }]}>
+                  Exchange Rate
+                </Text>
+                <Text style={[styles.exchangeRate, { color: colors.primary }]}>
+                  1 GHS = {exchangeRate?.sellRate || exchangeRate?.rate || 0} {selectedCountry.currency}
+                </Text>
               </View>
-
-              <View style={styles.exchangeRow}>
-                <View style={styles.exchangeColumn}>
-                  <Text style={[styles.exchangeLabel, { color: colors.textSecondary }]}>They Receive</Text>
-                  <View style={styles.amountRow}>
-                    <Text style={[styles.currencyCode, { color: colors.text }]}>{selectedCountry.currency}</Text>
-                    <Text style={[styles.receiveAmount, { color: colors.text }]}>{receiveAmount}</Text>
-                  </View>
-                </View>
-              </View>
-
-              <View style={[styles.rateInfo, { backgroundColor: colors.surfaceVariant }]}>
-                <Ionicons name="information-circle" size={16} color={colors.primary} />
-                <Text style={[styles.rateText, { color: colors.textSecondary }]}>
-                  1 GHS = {currentRate} {selectedCountry.currency} • Fee: GHS {fee}
+              <View style={styles.exchangeDetails}>
+                <Text style={[styles.exchangeNote, { color: colors.textMuted }]}>
+                  {isLoadingRate ? 'Loading...' : 'Real-time rate'}
                 </Text>
               </View>
             </Card>
           </Animated.View>
 
-          <Animated.View entering={FadeInDown.delay(200).duration(600)} style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>Destination Country</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              {countries.map((country: { code: string; name: string; flag: string; currency: string }) => (
-                <TouchableOpacity
-                  key={country.code}
-                  style={[
-                    styles.countryChip,
-                    { backgroundColor: colors.surface, borderColor: colors.border },
-                    selectedCountry.code === country.code && { borderColor: colors.primary, backgroundColor: colors.primary + '10' },
-                  ]}
-                  onPress={() => setSelectedCountry(country)}
-                >
-                  <Text style={styles.countryFlag}>{country.flag}</Text>
-                  <Text style={[styles.countryName, { color: colors.text }]}>{country.name}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </Animated.View>
+          {/* Amount Section */}
+          <Animated.View entering={FadeInUp.duration(800).delay(400)} style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Amount to Send</Text>
+            <Card variant="default" padding="lg" style={styles.amountCard}>
+              <View style={styles.amountInputContainer}>
+                <Text style={[styles.currencySymbol, { color: colors.primary }]}>GHS</Text>
+                <Input
+                  placeholder="0.00"
+                  value={sendAmount}
+                  onChangeText={setSendAmount}
+                  keyboardType="numeric"
+                  variant="minimal"
+                  size="lg"
+                  style={styles.amountInput}
+                  textAlign="right"
+                />
+              </View>
+            </Card>
 
-          <Animated.View entering={FadeInDown.delay(300).duration(600)} style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>Pay With</Text>
-            {paymentMethods.map((method) => (
-              <TouchableOpacity
-                key={method.id}
-                style={[
-                  styles.paymentMethodCard,
-                  { backgroundColor: colors.card, borderColor: colors.cardBorder },
-                  selectedPaymentMethod === method.id && { borderColor: colors.primary, borderWidth: 2 },
-                ]}
-                onPress={() => setSelectedPaymentMethod(method.id)}
-              >
-                {method.logo ? (
-                  <Image source={method.logo} style={styles.paymentMethodLogoImage} resizeMode="contain" />
-                ) : (
-                  <View style={[styles.paymentMethodIcon, { backgroundColor: method.id === 'wallet' ? colors.primary + '15' : (method.color || colors.primary) + '15' }]}>
-                    <Ionicons name={method.icon as any} size={20} color={method.id === 'wallet' ? colors.primary : method.color} />
-                  </View>
-                )}
-                <View style={styles.paymentMethodInfo}>
-                  <Text style={[styles.paymentMethodName, { color: colors.text }]}>{method.name}</Text>
-                  {method.id === 'wallet' && (
-                    <Text style={[styles.paymentMethodBalance, { color: colors.textSecondary }]}>
-                      Balance: GHS {method.balance?.toFixed(2)}
-                    </Text>
-                  )}
+            {/* Quick Amounts */}
+            <View style={styles.quickAmountsContainer}>
+              <Text style={[styles.quickAmountsLabel, { color: colors.textSecondary }]}>
+                Quick amounts
+              </Text>
+              <View style={styles.quickAmountsGrid}>
+                {quickAmounts.map((value, index) => (
+                  <Animated.View
+                    key={value}
+                    entering={FadeInUp.duration(400).delay(600 + index * 50)}
+                  >
+                    <TouchableOpacity
+                      style={[
+                        styles.quickAmountButton,
+                        { 
+                          backgroundColor: sendAmount === value.toString() 
+                            ? colors.primary 
+                            : colors.surface 
+                        }
+                      ]}
+                      onPress={() => handleQuickAmount(value)}
+                    >
+                      <Text style={[
+                        styles.quickAmountText,
+                        { 
+                          color: sendAmount === value.toString() 
+                            ? '#FFFFFF' 
+                            : colors.text 
+                        }
+                      ]}>
+                        {value}
+                      </Text>
+                    </TouchableOpacity>
+                  </Animated.View>
+                ))}
+              </View>
+            </View>
+
+            {/* Amount Summary */}
+            {sendAmount && (
+              <Animated.View entering={FadeInUp.duration(600)} style={styles.summaryCard}>
+                <View style={styles.summaryRow}>
+                  <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>
+                    Fee
+                  </Text>
+                  <Text style={[styles.summaryValue, { color: colors.text }]}>
+                    GHS {calculateFee().toFixed(2)}
+                  </Text>
                 </View>
-                {selectedPaymentMethod === method.id && (
-                  <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
-                )}
-              </TouchableOpacity>
-            ))}
+                <View style={styles.summaryRow}>
+                  <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>
+                    Recipient receives
+                  </Text>
+                  <Text style={[styles.summaryValue, { color: colors.success }]}>
+                    {selectedCountry.currency} {calculateReceiveAmount().toFixed(2)}
+                  </Text>
+                </View>
+              </Animated.View>
+            )}
           </Animated.View>
 
-          <Animated.View entering={FadeInDown.delay(400).duration(600)} style={styles.section}>
+          {/* Country Selection */}
+          <Animated.View entering={FadeInUp.duration(800).delay(600)} style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Recipient Country</Text>
+            <TouchableOpacity
+              style={[styles.countrySelector, { backgroundColor: colors.surface }]}
+            >
+              <Text style={styles.countryFlag}>{selectedCountry.flag}</Text>
+              <Text style={[styles.countryName, { color: colors.text }]}>
+                {selectedCountry.name}
+              </Text>
+              <Ionicons name="chevron-down" size={20} color={colors.textMuted} />
+            </TouchableOpacity>
+          </Animated.View>
+
+          {/* Recipient Details */}
+          <Animated.View entering={FadeInUp.duration(800).delay(800)} style={styles.section}>
             <Text style={[styles.sectionTitle, { color: colors.text }]}>Recipient Details</Text>
             <Input
-              label="Full Name"
-              placeholder="Enter recipient's full name"
+              placeholder="Recipient name"
               value={recipientName}
               onChangeText={setRecipientName}
-              leftIcon="person-outline"
+              leftIcon={<Ionicons name="person" size={20} color={colors.textMuted} />}
+              variant="glass"
+              style={styles.input}
             />
             <Input
-              label="Phone Number"
-              placeholder="Enter phone number"
+              placeholder="Phone number"
               value={recipientPhone}
               onChangeText={setRecipientPhone}
               keyboardType="phone-pad"
-              leftIcon="call-outline"
+              leftIcon={<Ionicons name="phone-portrait" size={20} color={colors.textMuted} />}
+              variant="glass"
+              style={styles.input}
             />
           </Animated.View>
 
-          <Animated.View entering={FadeInDown.delay(500).duration(600)}>
+          {/* Payment Method */}
+          <Animated.View entering={FadeInUp.duration(800).delay(1000)} style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Pay With</Text>
+            <View style={styles.paymentMethodsGrid}>
+              {paymentMethods.map((method, index) => (
+                <Animated.View
+                  key={method.id}
+                  entering={FadeInUp.duration(600).delay(1200 + index * 100)}
+                >
+                  <TouchableOpacity
+                    style={[
+                      styles.paymentMethodCard,
+                      {
+                        backgroundColor: selectedPaymentMethod === method.id 
+                          ? colors.primary + '15'
+                          : colors.surface,
+                        borderColor: selectedPaymentMethod === method.id 
+                          ? colors.primary
+                          : colors.borderLight,
+                      }
+                    ]}
+                    onPress={() => handlePaymentMethodSelect(method.id)}
+                  >
+                    <View style={[
+                      styles.paymentMethodIcon,
+                      { backgroundColor: method.color ? method.color + '20' : colors.primary + '20' }
+                    ]}>
+                      {method.logo ? (
+                        <Image source={method.logo} style={styles.paymentMethodLogo} />
+                      ) : (
+                        <Ionicons name={method.icon as any} size={20} color={method.color || colors.primary} />
+                      )}
+                    </View>
+                    <Text style={[styles.paymentMethodName, { color: colors.text }]}>
+                      {method.name}
+                    </Text>
+                  </TouchableOpacity>
+                </Animated.View>
+              ))}
+            </View>
+          </Animated.View>
+
+          {/* Continue Button */}
+          <Animated.View entering={FadeInUp.duration(800).delay(1200)} style={styles.section}>
             <Button
               title="Continue"
               onPress={handleContinue}
-              fullWidth
+              loading={isSubmitting}
+              disabled={!sendAmount || !recipientName || !recipientPhone || parseFloat(sendAmount) <= 0}
+              gradient={true}
+              fullWidth={true}
               size="lg"
-              icon={<Ionicons name="arrow-forward" size={20} color="#FFFFFF" />}
-              iconPosition="right"
             />
           </Animated.View>
 
-          <View style={{ height: 100 }} />
+          <View style={{ height: Spacing.xxxl }} />
         </ScrollView>
-      </View>
 
-      {/* KYC Required Modal */}
-      <KYCRequiredModal
-        visible={showKYCModal}
-        onClose={() => setShowKYCModal(false)}
-        onVerifyNow={() => {
-          setShowKYCModal(false);
-          navigation.navigate('Profile', { screen: 'KYCVerification' });
-        }}
-        kycStatus={user?.kyc_status}
-      />
+        {/* KYC Modal */}
+        <KYCRequiredModal
+          visible={showKYCModal}
+          onClose={() => setShowKYCModal(false)}
+          onVerifyNow={() => navigation.navigate('KYCVerification')}
+        />
+      </View>
     </KeyboardAvoidingView>
   );
 };
@@ -318,134 +420,171 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  contentContainer: {
+    paddingBottom: Spacing.xxl,
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: Spacing.lg,
-    paddingBottom: Spacing.md,
+    marginBottom: Spacing.xl,
   },
   backButton: {
-    width: 44,
-    height: 44,
+    width: ComponentSize.iconButton.md,
+    height: ComponentSize.iconButton.md,
+    borderRadius: BorderRadius.full,
+    alignItems: 'center',
     justifyContent: 'center',
   },
   title: {
-    fontSize: FontSize.xl,
-    fontWeight: FontWeight.bold,
-  },
-  content: {
-    paddingHorizontal: Spacing.lg,
-  },
-  exchangeCard: {
-    marginBottom: Spacing.lg,
-  },
-  exchangeRow: {
-    paddingVertical: Spacing.sm,
-  },
-  exchangeColumn: {},
-  exchangeLabel: {
-    fontSize: FontSize.sm,
-    marginBottom: Spacing.xs,
-  },
-  amountRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  currencyCode: {
-    fontSize: FontSize.lg,
-    fontWeight: FontWeight.semibold,
-    marginRight: Spacing.sm,
-  },
-  receiveAmount: {
     fontSize: FontSize.xxl,
-    fontWeight: FontWeight.bold,
+    fontWeight: FontWeight.bold as any,
   },
-  exchangeIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: Spacing.sm,
-  },
-  exchangeLine: {
-    flex: 1,
-    height: 1,
-  },
-  exchangeIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginHorizontal: Spacing.md,
-  },
-  rateInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: Spacing.sm,
-    borderRadius: BorderRadius.md,
-    marginTop: Spacing.sm,
-    gap: Spacing.xs,
-  },
-  rateText: {
-    fontSize: FontSize.sm,
+  placeholder: {
+    width: ComponentSize.iconButton.md,
   },
   section: {
-    marginBottom: Spacing.lg,
+    paddingHorizontal: Spacing.lg,
+    marginBottom: Spacing.xl,
   },
   sectionTitle: {
     fontSize: FontSize.lg,
-    fontWeight: FontWeight.semibold,
+    fontWeight: FontWeight.semibold as any,
     marginBottom: Spacing.md,
   },
-  countryChip: {
+  exchangeHeader: {
+    alignItems: 'center',
+    marginBottom: Spacing.sm,
+  },
+  exchangeLabel: {
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.medium as any,
+    marginBottom: Spacing.xs,
+  },
+  exchangeRate: {
+    fontSize: FontSize.xxxl,
+    fontWeight: FontWeight.bold as any,
+  },
+  exchangeDetails: {
+    alignItems: 'center',
+  },
+  exchangeNote: {
+    fontSize: FontSize.sm,
+  },
+  amountCard: {
+    marginBottom: Spacing.lg,
+  },
+  amountInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.full,
-    borderWidth: 1,
+  },
+  currencySymbol: {
+    fontSize: FontSize.xxxl,
+    fontWeight: FontWeight.bold as any,
     marginRight: Spacing.sm,
   },
+  amountInput: {
+    flex: 1,
+    marginLeft: Spacing.sm,
+  },
+  quickAmountsContainer: {
+    marginTop: Spacing.lg,
+  },
+  quickAmountsLabel: {
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.medium as any,
+    marginBottom: Spacing.md,
+  },
+  quickAmountsGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  quickAmountButton: {
+    width: (width - Spacing.lg * 2 - Spacing.md * 5) / 6,
+    height: ComponentSize.buttonHeight.sm,
+    borderRadius: BorderRadius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  quickAmountText: {
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.semibold as any,
+  },
+  summaryCard: {
+    marginTop: Spacing.lg,
+    padding: Spacing.md,
+    backgroundColor: '#10B98120',
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+    borderColor: '#34D39930',
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.xs,
+  },
+  summaryLabel: {
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.medium as any,
+  },
+  summaryValue: {
+    fontSize: FontSize.md,
+    fontWeight: FontWeight.semibold as any,
+  },
+  countrySelector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    ...Shadow.card,
+  },
   countryFlag: {
-    fontSize: 20,
-    marginRight: Spacing.xs,
+    fontSize: FontSize.xxxl,
+    marginRight: Spacing.md,
   },
   countryName: {
-    fontSize: FontSize.sm,
-    fontWeight: FontWeight.medium,
+    fontSize: FontSize.md,
+    fontWeight: FontWeight.semibold as any,
+    flex: 1,
+  },
+  input: {
+    marginBottom: Spacing.md,
+  },
+  paymentMethodsGrid: {
+    gap: Spacing.md,
   },
   paymentMethodCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: Spacing.md,
+    padding: Spacing.lg,
     borderRadius: BorderRadius.lg,
-    borderWidth: 1,
-    marginBottom: Spacing.sm,
+    borderWidth: 2,
+    ...Shadow.card,
   },
   paymentMethodIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    justifyContent: 'center',
+    width: ComponentSize.avatar.md,
+    height: ComponentSize.avatar.md,
+    borderRadius: BorderRadius.md,
     alignItems: 'center',
+    justifyContent: 'center',
     marginRight: Spacing.md,
   },
-  paymentMethodInfo: {
-    flex: 1,
+  paymentMethodLogo: {
+    width: 32,
+    height: 32,
+    resizeMode: 'contain',
   },
   paymentMethodName: {
     fontSize: FontSize.md,
-    fontWeight: FontWeight.medium,
-  },
-  paymentMethodBalance: {
-    fontSize: FontSize.sm,
-    marginTop: 2,
-  },
-  paymentMethodLogoImage: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    marginRight: Spacing.md,
+    fontWeight: FontWeight.semibold as any,
+    flex: 1,
   },
 });
 

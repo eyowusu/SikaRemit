@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Badge } from '@/components/ui/badge'
 import { CreditCard, Smartphone, Monitor, DollarSign, CheckCircle, XCircle } from 'lucide-react'
 import { toast } from 'sonner'
+import api from '@/lib/api/axios'
 
 interface TransactionProcessingProps {
   devices: any[];
@@ -36,16 +37,9 @@ const TransactionProcessing = ({ devices, onTransactionComplete }: TransactionPr
   useEffect(() => {
     const fetchCurrencies = async () => {
       try {
-        const token = localStorage.getItem('access_token')
-        const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
-        const response = await fetch(`${API_URL}/api/v1/payments/currencies/`, {
-          headers: token ? { Authorization: `Bearer ${token}` } : {}
-        })
-        if (response.ok) {
-          const data = await response.json()
-          const currencyList = Array.isArray(data) ? data : (data.results || [])
-          setCurrencies(currencyList.filter((c: any) => c.is_active))
-        }
+        const response = await api.get('/api/v1/payments/currencies/')
+        const currencyList = Array.isArray(response.data) ? response.data : (response.data.results || [])
+        setCurrencies(currencyList.filter((c: any) => c.is_active))
       } catch (error) {
         console.error('Failed to load currencies:', error)
       }
@@ -95,25 +89,11 @@ const TransactionProcessing = ({ devices, onTransactionComplete }: TransactionPr
         transactionData.card_data = cardData
       }
 
-      const response = await fetch('/api/v1/payments/pos/process-transaction/', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('access_token')}`
-        },
-        body: JSON.stringify(transactionData)
-      })
+      const response = await api.post('/api/v1/payments/pos/process-transaction/', transactionData)
 
-      const result = await response.json()
-
-      if (response.ok) {
-        setTransactionResult(result)
-        toast.success('Transaction processed successfully')
-        onTransactionComplete(result)
-      } else {
-        setTransactionResult({ success: false, error: result.error })
-        toast.error(result.error || 'Transaction failed')
-      }
+      setTransactionResult(response.data)
+      toast.success('Transaction processed successfully')
+      onTransactionComplete(response.data)
     } catch (error) {
       setTransactionResult({ success: false, error: 'Network error occurred' })
       toast.error('Network error occurred')
@@ -126,27 +106,15 @@ const TransactionProcessing = ({ devices, onTransactionComplete }: TransactionPr
     if (!transactionResult?.transaction_id) return
 
     try {
-      const response = await fetch('/api/v1/payments/pos/generate-receipt/', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('access_token')}`
-        },
-        body: JSON.stringify({
-          transaction_id: transactionResult.transaction_id,
-          receipt_type: 'customer'
-        })
+      const response = await api.post('/api/v1/payments/pos/generate-receipt/', {
+        transaction_id: transactionResult.transaction_id,
+        receipt_type: 'customer'
       })
 
-      if (response.ok) {
-        const data = await response.json()
-        setReceipt(data.receipt_text)
-        setShowReceipt(true)
-      } else {
-        toast.error('Failed to generate receipt')
-      }
+      setReceipt(response.data.receipt_text)
+      setShowReceipt(true)
     } catch (error) {
-      toast.error('Network error occurred')
+      toast.error('Failed to generate receipt')
     }
   }
 

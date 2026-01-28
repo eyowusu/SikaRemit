@@ -90,6 +90,46 @@ export default function MerchantInvoicesPage() {
     queryFn: getMerchantInvoices,
   })
 
+  // Calculate invoice statistics from real data
+  const calculateInvoiceStats = () => {
+    if (!invoices || invoices.length === 0) {
+      return {
+        totalInvoiced: 0,
+        totalPaid: 0,
+        totalPending: 0,
+        totalOverdue: 0,
+        paidPercentage: 0,
+        pendingPercentage: 0,
+        overduePercentage: 0,
+        growthRate: 0
+      }
+    }
+
+    const totalInvoiced = invoices.reduce((sum: number, invoice: any) => sum + (invoice.amount || invoice.total || 0), 0)
+    const paidInvoices = invoices.filter((invoice: any) => invoice.status === 'paid')
+    const pendingInvoices = invoices.filter((invoice: any) => invoice.status === 'sent' || invoice.status === 'pending')
+    const overdueInvoices = invoices.filter((invoice: any) => {
+      return invoice.status === 'sent' && new Date(invoice.dueDate) < new Date()
+    })
+
+    const totalPaid = paidInvoices.reduce((sum: number, invoice: any) => sum + (invoice.amount || invoice.total || 0), 0)
+    const totalPending = pendingInvoices.reduce((sum: number, invoice: any) => sum + (invoice.amount || invoice.total || 0), 0)
+    const totalOverdue = overdueInvoices.reduce((sum: number, invoice: any) => sum + (invoice.amount || invoice.total || 0), 0)
+
+    return {
+      totalInvoiced,
+      totalPaid,
+      totalPending,
+      totalOverdue,
+      paidPercentage: totalInvoiced > 0 ? (totalPaid / totalInvoiced) * 100 : 0,
+      pendingPercentage: totalInvoiced > 0 ? (totalPending / totalInvoiced) * 100 : 0,
+      overduePercentage: totalInvoiced > 0 ? (totalOverdue / totalInvoiced) * 100 : 0,
+      growthRate: 0 // TODO: Calculate from historical data when available
+    }
+  }
+
+  const stats = calculateInvoiceStats()
+
   const createMutation = useMutation({
     mutationFn: async (invoiceData: any) => {
       // Calculate totals
@@ -292,11 +332,11 @@ export default function MerchantInvoicesPage() {
               </CardHeader>
 
               <CardContent className="relative z-10">
-                <div className="text-3xl font-bold text-sikaremit-foreground mb-2">{formatAmount(45678.90)}</div>
+                <div className="text-3xl font-bold text-sikaremit-foreground mb-2">{formatAmount(stats.totalInvoiced)}</div>
                 <div className="space-y-1">
-                  <div className={`text-xs font-semibold px-2 py-1 rounded-full inline-flex items-center bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400`}>
+                  <div className={`text-xs font-semibold px-2 py-1 rounded-full inline-flex items-center ${stats.growthRate >= 0 ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'}`}>
                     <TrendingUp className="w-3 h-3 mr-1" />
-                    +15.3%
+                    {stats.growthRate >= 0 ? '+' : ''}{stats.growthRate.toFixed(1)}%
                   </div>
                   <p className="text-xs text-sikaremit-muted">vs last month</p>
                 </div>
@@ -317,11 +357,11 @@ export default function MerchantInvoicesPage() {
               </CardHeader>
 
               <CardContent className="relative z-10">
-                <div className="text-3xl font-bold text-sikaremit-foreground mb-2">{formatAmount(32456.78)}</div>
+                <div className="text-3xl font-bold text-sikaremit-foreground mb-2">{formatAmount(stats.totalPaid)}</div>
                 <div className="space-y-1">
                   <div className={`text-xs font-semibold px-2 py-1 rounded-full inline-flex items-center bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400`}>
                     <CheckCircle className="w-3 h-3 mr-1" />
-                    71.1%
+                    {stats.paidPercentage.toFixed(1)}%
                   </div>
                   <p className="text-xs text-sikaremit-muted">Payment rate</p>
                 </div>
@@ -342,11 +382,11 @@ export default function MerchantInvoicesPage() {
               </CardHeader>
 
               <CardContent className="relative z-10">
-                <div className="text-3xl font-bold text-sikaremit-foreground mb-2">{formatAmount(8912.34)}</div>
+                <div className="text-3xl font-bold text-sikaremit-foreground mb-2">{formatAmount(stats.totalPending)}</div>
                 <div className="space-y-1">
                   <div className={`text-xs font-semibold px-2 py-1 rounded-full inline-flex items-center bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400`}>
                     <Clock className="w-3 h-3 mr-1" />
-                    19.5%
+                    {stats.pendingPercentage.toFixed(1)}%
                   </div>
                   <p className="text-xs text-sikaremit-muted">Awaiting payment</p>
                 </div>
@@ -367,11 +407,11 @@ export default function MerchantInvoicesPage() {
               </CardHeader>
 
               <CardContent className="relative z-10">
-                <div className="text-3xl font-bold text-sikaremit-foreground mb-2">{formatAmount(2309.78)}</div>
+                <div className="text-3xl font-bold text-sikaremit-foreground mb-2">{formatAmount(stats.totalOverdue)}</div>
                 <div className="space-y-1">
                   <div className={`text-xs font-semibold px-2 py-1 rounded-full inline-flex items-center bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400`}>
                     <AlertCircle className="w-3 h-3 mr-1" />
-                    5.1%
+                    {stats.overduePercentage.toFixed(1)}%
                   </div>
                   <p className="text-xs text-sikaremit-muted">Needs attention</p>
                 </div>

@@ -54,7 +54,17 @@ export default function MerchantAnalyticsPage() {
     )
   }
 
-  const data = analyticsData || {
+  const data = analyticsData ? {
+    totalRevenue: analyticsData.revenue?.total || 0,
+    totalTransactions: analyticsData.transactions?.total || 0,
+    totalCustomers: analyticsData.customers?.total || 0,
+    averageOrderValue: analyticsData.transactions?.total ? (analyticsData.revenue?.total || 0) / analyticsData.transactions.total : 0,
+    conversionRate: 0, // TODO: Calculate from actual data
+    topProducts: [], // TODO: Add from backend
+    revenueByDay: analyticsData.revenue?.chart_data || [],
+    customerAcquisition: { new: 0, returning: analyticsData.customers?.total || 0, churn: 0 }, // TODO: Add from backend
+    paymentMethods: [] // TODO: Add from backend
+  } : {
     totalRevenue: 0,
     totalTransactions: 0,
     totalCustomers: 0,

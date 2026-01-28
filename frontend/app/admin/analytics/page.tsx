@@ -58,10 +58,13 @@ export default function AdminAnalyticsPage() {
     queryFn: getAnalyticsOverview
   })
 
-  const { data: alertsData, isLoading: alertsLoading } = useQuery({
+  const { data: alertsDataRaw, isLoading: alertsLoading } = useQuery({
     queryKey: ['analytics-alerts'],
     queryFn: getPerformanceAlerts
   })
+
+  // Ensure alertsData is always an array
+  const alertsData = Array.isArray(alertsDataRaw) ? alertsDataRaw : []
 
   const handleRefresh = async () => {
     setRefreshing(true)
@@ -143,9 +146,9 @@ export default function AdminAnalyticsPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{realtimeData.transactions_last_24h.toLocaleString()}</div>
+                <div className="text-2xl font-bold">{(realtimeData?.transactions_last_24h ?? 0).toLocaleString()}</div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {formatCurrency(realtimeData.transaction_value_last_24h)} value
+                  {formatCurrency(realtimeData?.transaction_value_last_24h ?? 0)} value
                 </p>
               </CardContent>
             </Card>
@@ -157,7 +160,7 @@ export default function AdminAnalyticsPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-orange-600">{realtimeData.active_alerts}</div>
+                <div className="text-2xl font-bold text-orange-600">{realtimeData?.active_alerts ?? 0}</div>
                 <p className="text-xs text-muted-foreground mt-1">
                   Require attention
                 </p>
@@ -172,7 +175,7 @@ export default function AdminAnalyticsPage() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-green-600 capitalize">
-                  {realtimeData.system_health}
+                  {realtimeData?.system_health ?? 'unknown'}
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
                   All systems operational
@@ -250,7 +253,7 @@ export default function AdminAnalyticsPage() {
                       <CardTitle className="text-sm font-medium">Total Transactions</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold">{overviewData.summary.total_transactions.toLocaleString()}</div>
+                      <div className="text-2xl font-bold">{(overviewData.summary?.total_transactions ?? 0).toLocaleString()}</div>
                     </CardContent>
                   </Card>
                   <Card>
@@ -258,7 +261,7 @@ export default function AdminAnalyticsPage() {
                       <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold">{formatCurrency(overviewData.summary.total_revenue)}</div>
+                      <div className="text-2xl font-bold">{formatCurrency(overviewData.summary?.total_revenue ?? 0)}</div>
                     </CardContent>
                   </Card>
                   <Card>
@@ -266,7 +269,7 @@ export default function AdminAnalyticsPage() {
                       <CardTitle className="text-sm font-medium">Fee Revenue</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold text-green-600">{formatCurrency(overviewData.summary.fee_revenue)}</div>
+                      <div className="text-2xl font-bold text-green-600">{formatCurrency(overviewData.summary?.fee_revenue ?? 0)}</div>
                     </CardContent>
                   </Card>
                   <Card>
@@ -274,7 +277,7 @@ export default function AdminAnalyticsPage() {
                       <CardTitle className="text-sm font-medium">Avg Transaction</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold">{formatCurrency(overviewData.summary.average_transaction)}</div>
+                      <div className="text-2xl font-bold">{formatCurrency(overviewData.summary?.average_transaction ?? 0)}</div>
                     </CardContent>
                   </Card>
                   <Card>
@@ -282,7 +285,7 @@ export default function AdminAnalyticsPage() {
                       <CardTitle className="text-sm font-medium">New Customers</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold text-blue-600">+{overviewData.summary.customer_growth}</div>
+                      <div className="text-2xl font-bold text-blue-600">+{overviewData.summary?.customer_growth ?? 0}</div>
                     </CardContent>
                   </Card>
                   <Card>
@@ -290,7 +293,7 @@ export default function AdminAnalyticsPage() {
                       <CardTitle className="text-sm font-medium">Success Rate</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold text-green-600">{overviewData.summary.success_rate}%</div>
+                      <div className="text-2xl font-bold text-green-600">{overviewData.summary?.success_rate ?? 0}%</div>
                     </CardContent>
                   </Card>
                 </div>
@@ -310,7 +313,7 @@ export default function AdminAnalyticsPage() {
                         <BarChart3 className="h-12 w-12 mx-auto text-muted-foreground mb-2" />
                         <p className="text-muted-foreground">Interactive chart would be displayed here</p>
                         <p className="text-sm text-muted-foreground mt-1">
-                          Peak: {Math.max(...overviewData.daily_trends.map(d => d.transactions))} transactions
+                          Peak: {overviewData.daily_trends?.length ? Math.max(...overviewData.daily_trends.map(d => d.transactions || 0)) : 0} transactions
                         </p>
                       </div>
                     </div>
@@ -334,7 +337,7 @@ export default function AdminAnalyticsPage() {
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-3">
-                      {Object.entries(snapshotData.payment_method_usage).map(([method, count]) => (
+                      {snapshotData.payment_method_usage ? Object.entries(snapshotData.payment_method_usage).map(([method, count]) => (
                         <div key={method} className="flex items-center justify-between">
                           <span className="font-medium">{method}</span>
                           <div className="flex items-center gap-2">
@@ -342,14 +345,14 @@ export default function AdminAnalyticsPage() {
                               <div
                                 className="bg-blue-600 h-2 rounded-full"
                                 style={{
-                                  width: `${(count as number / Math.max(...Object.values(snapshotData.payment_method_usage))) * 100}%`
+                                  width: `${(count as number / Math.max(...Object.values(snapshotData.payment_method_usage), 1)) * 100}%`
                                 }}
                               />
                             </div>
                             <span className="text-sm text-muted-foreground w-12 text-right">{count as number}</span>
                           </div>
                         </div>
-                      ))}
+                      )) : <p className="text-muted-foreground">No data available</p>}
                     </div>
                   </CardContent>
                 </Card>
@@ -414,7 +417,7 @@ export default function AdminAnalyticsPage() {
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-4">
-                      {snapshotData.top_merchants_by_volume.map((merchant, index) => (
+                      {snapshotData.top_merchants_by_volume?.length ? snapshotData.top_merchants_by_volume.map((merchant, index) => (
                         <div key={merchant.merchant_id} className="flex items-center justify-between p-3 bg-muted/20 rounded-lg">
                           <div className="flex items-center gap-3">
                             <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-sm font-semibold">
@@ -426,7 +429,7 @@ export default function AdminAnalyticsPage() {
                             </div>
                           </div>
                         </div>
-                      ))}
+                      )) : <p className="text-muted-foreground">No data available</p>}
                     </div>
                   </CardContent>
                 </Card>
@@ -441,7 +444,7 @@ export default function AdminAnalyticsPage() {
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-4">
-                      {snapshotData.top_merchants_by_revenue.map((merchant, index) => (
+                      {snapshotData.top_merchants_by_revenue?.length ? snapshotData.top_merchants_by_revenue.map((merchant, index) => (
                         <div key={merchant.merchant_id} className="flex items-center justify-between p-3 bg-muted/20 rounded-lg">
                           <div className="flex items-center gap-3">
                             <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center text-sm font-semibold">
@@ -453,7 +456,7 @@ export default function AdminAnalyticsPage() {
                             </div>
                           </div>
                         </div>
-                      ))}
+                      )) : <p className="text-muted-foreground">No data available</p>}
                     </div>
                   </CardContent>
                 </Card>
@@ -476,7 +479,7 @@ export default function AdminAnalyticsPage() {
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-3">
-                      {Object.entries(snapshotData.transactions_by_country).map(([country, count]) => (
+                      {snapshotData.transactions_by_country ? Object.entries(snapshotData.transactions_by_country).map(([country, count]) => (
                         <div key={country} className="flex items-center justify-between">
                           <span className="font-medium">{country}</span>
                           <div className="flex items-center gap-2">
@@ -484,14 +487,14 @@ export default function AdminAnalyticsPage() {
                               <div
                                 className="bg-purple-600 h-2 rounded-full"
                                 style={{
-                                  width: `${(count as number / Math.max(...Object.values(snapshotData.transactions_by_country))) * 100}%`
+                                  width: `${(count as number / Math.max(...Object.values(snapshotData.transactions_by_country), 1)) * 100}%`
                                 }}
                               />
                             </div>
                             <span className="text-sm text-muted-foreground w-12 text-right">{count as number}</span>
                           </div>
                         </div>
-                      ))}
+                      )) : <p className="text-muted-foreground">No data available</p>}
                     </div>
                   </CardContent>
                 </Card>
@@ -504,12 +507,12 @@ export default function AdminAnalyticsPage() {
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-3">
-                      {Object.entries(snapshotData.revenue_by_country).map(([country, revenue]) => (
+                      {snapshotData.revenue_by_country ? Object.entries(snapshotData.revenue_by_country).map(([country, revenue]) => (
                         <div key={country} className="flex items-center justify-between">
                           <span className="font-medium">{country}</span>
                           <span className="font-semibold">{formatCurrency(revenue as number)}</span>
                         </div>
-                      ))}
+                      )) : <p className="text-muted-foreground">No data available</p>}
                     </div>
                   </CardContent>
                 </Card>

@@ -23,55 +23,40 @@ export default function RecentTransactions() {
   const { data: transactions, isLoading } = useQuery({
     queryKey: ['merchant-recent-transactions'],
     queryFn: async () => {
-      // Enhanced mock data with more details
-      return [
-        {
-          id: 'TXN-001',
-          amount: 125.50,
-          status: 'completed',
-          created_at: '2024-11-10T10:30:00Z',
-          customer_email: 'customer1@example.com',
-          payment_method: 'card',
-          risk_score: 15
-        },
-        {
-          id: 'TXN-002',
-          amount: 89.99,
-          status: 'completed',
-          created_at: '2024-11-10T09:15:00Z',
-          customer_email: 'customer2@example.com',
-          payment_method: 'mobile_money',
-          risk_score: 8
-        },
-        {
-          id: 'TXN-003',
-          amount: 245.00,
-          status: 'pending',
-          created_at: '2024-11-10T08:45:00Z',
-          customer_email: 'customer3@example.com',
-          payment_method: 'bank_transfer',
-          risk_score: 25
-        },
-        {
-          id: 'TXN-004',
-          amount: 67.25,
-          status: 'completed',
-          created_at: '2024-11-09T16:20:00Z',
-          customer_email: 'customer4@example.com',
-          payment_method: 'card',
-          risk_score: 12
-        },
-        {
-          id: 'TXN-005',
-          amount: 199.99,
-          status: 'failed',
-          created_at: '2024-11-09T14:10:00Z',
-          customer_email: 'customer5@example.com',
-          payment_method: 'card',
-          risk_score: 85
+      // Check if we have auth token first
+      const token = localStorage.getItem('access_token')
+      if (!token) {
+        return []
+      }
+      
+      // Only try APIs that actually exist - don't make requests to non-existent endpoints
+      // For now, return empty array until backend APIs are implemented
+      return []
+      
+      // TODO: Uncomment when backend APIs are ready
+      /*
+      try {
+        const response = await fetch('/api/v1/merchants/dashboard/recent-transactions/', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        })
+        
+        if (response.ok) {
+          const data = await response.json()
+          return data.results || data || []
         }
-      ] as Transaction[]
-    }
+      } catch (error) {
+        // Silently ignore API errors
+      }
+      
+      return []
+      */
+    },
+    retry: false,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false
   })
 
   const getStatusBadge = (status: string) => {
@@ -148,7 +133,7 @@ export default function RecentTransactions() {
 
   return (
     <div className="space-y-4">
-      {transactions?.slice(0, 5).map((transaction, index) => {
+      {transactions?.slice(0, 5).map((transaction: Transaction, index: number) => {
         const riskInfo = getRiskIndicator(transaction.risk_score)
         return (
           <div

@@ -1,14 +1,41 @@
 import React from 'react';
-import { View, Text, StyleSheet, Dimensions, Image } from 'react-native';
+import { 
+  View, 
+  Text, 
+  StyleSheet, 
+  Dimensions, 
+  Image,
+  ScrollView,
+  TouchableOpacity 
+} from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
-import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
+import * as Haptics from 'expo-haptics';
+import Animated, { 
+  FadeInDown, 
+  FadeInUp,
+  FadeInRight,
+  useSharedValue, 
+  useAnimatedStyle, 
+  withSpring,
+  withTiming,
+  interpolate,
+  Extrapolation,
+} from 'react-native-reanimated';
 import { Button } from '../../components/ui';
 import { useTheme } from '../../context/ThemeContext';
 import { AuthStackParamList } from '../../types';
-import { FontSize, FontWeight, Spacing } from '../../constants/theme';
+import { 
+  BorderRadius, 
+  FontSize, 
+  FontWeight, 
+  Spacing, 
+  Shadow, 
+  AnimationConfig, 
+  ComponentSize 
+} from '../../constants/theme';
 
 const { width, height } = Dimensions.get('window');
 
@@ -20,75 +47,194 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ navigation }) => {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
 
+  const scrollY = useSharedValue(0);
+  
+  const onScroll = (event: any) => {
+    scrollY.value = event.nativeEvent.contentOffset.y;
+  };
+
+  const headerOpacity = interpolate(scrollY.value, [0, 100], [1, 0], Extrapolation.CLAMP);
+  const headerTranslateY = interpolate(scrollY.value, [0, 100], [0, -20], Extrapolation.CLAMP);
+
+  const featuresOpacity = interpolate(scrollY.value, [0, 200], [0, 1], Extrapolation.CLAMP);
+  const featuresTranslateY = interpolate(scrollY.value, [0, 200], [50, 0], Extrapolation.CLAMP);
+
+  const ctaOpacity = interpolate(scrollY.value, [0, 300], [0, 1], Extrapolation.CLAMP);
+  const ctaTranslateY = interpolate(scrollY.value, [0, 300], [100, 0], Extrapolation.CLAMP);
+
+  const handleGetStarted = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    navigation.navigate('Register');
+  };
+
+  const handleSignIn = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    navigation.navigate('Login');
+  };
+
   return (
     <View style={styles.container}>
       <LinearGradient
-        colors={['#7C3AED', '#EC4899']}
+        colors={colors.gradient.primary}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.gradient}
       >
-        <View style={[styles.content, { paddingTop: insets.top + 40 }]}>
-          <Animated.View entering={FadeInUp.delay(200).duration(800)} style={styles.logoContainer}>
-            <View style={styles.logoCircle}>
-              <Ionicons name="globe-outline" size={48} color="#7C3AED" />
-            </View>
-            <Text style={styles.logoText}>SikaRemit</Text>
-            <Text style={styles.tagline}>Financial Technology</Text>
-          </Animated.View>
+        <ScrollView
+          style={styles.scrollView}
+          showsVerticalScrollIndicator={false}
+          onScroll={onScroll}
+          scrollEventThrottle={16}
+        >
+          <View style={[styles.content, { paddingTop: insets.top + Spacing.xl }]}>
+            {/* Header */}
+            <Animated.View
+              style={[
+                styles.header,
+                {
+                  opacity: headerOpacity,
+                  transform: [{ translateY: headerTranslateY }]
+                }
+              ]}
+            >
+              <Text style={styles.appTitle}>SikaRemit</Text>
+              <Text style={styles.appTagline}>Financial Technology</Text>
+            </Animated.View>
 
-          <Animated.View entering={FadeInDown.delay(400).duration(800)} style={styles.heroSection}>
-            <Text style={styles.heroTitle}>
-              Secure Payments{'\n'}for the Digital Age
-            </Text>
-            <Text style={styles.heroSubtitle}>
-              Send money, pay bills, and manage your finances with ease. Fast, secure, and reliable.
-            </Text>
-          </Animated.View>
+            {/* Hero Section */}
+            <Animated.View 
+              entering={FadeInUp.duration(1000).delay(200)}
+              style={styles.heroSection}
+            >
+              <Text style={styles.heroTitle}>
+                Secure Payments{'\n'}for the Digital Age
+              </Text>
+              <Text style={styles.heroSubtitle}>
+                Send money, pay bills, and manage your finances with ease. Fast, secure, and reliable.
+              </Text>
+            </Animated.View>
 
-          <Animated.View entering={FadeInDown.delay(600).duration(800)} style={styles.features}>
-            <View style={styles.featureItem}>
-              <View style={styles.featureIcon}>
-                <Ionicons name="flash" size={20} color="#FFFFFF" />
+            {/* Features */}
+            <Animated.View
+              entering={FadeInUp.duration(1200).delay(400)}
+              style={[
+                styles.features,
+                {
+                  opacity: featuresOpacity,
+                  transform: [{ translateY: featuresTranslateY }]
+                }
+              ]}
+            >
+              <View style={styles.featureItem}>
+                <View style={[styles.featureIcon, { backgroundColor: colors.primary + '20' }]}>
+                  <Ionicons name="shield-checkmark" size={24} color={colors.primary} />
+                </View>
+                <Text style={styles.featureTitle}>Secure</Text>
+                <Text style={styles.featureDescription}>
+                  Bank-level security for your transactions
+                </Text>
               </View>
-              <Text style={styles.featureText}>Instant Transfers</Text>
-            </View>
-            <View style={styles.featureItem}>
-              <View style={styles.featureIcon}>
-                <Ionicons name="shield-checkmark" size={20} color="#FFFFFF" />
+              <View style={styles.featureItem}>
+                <View style={[styles.featureIcon, { backgroundColor: colors.accent + '20' }]}>
+                  <Ionicons name="flash" size={24} color={colors.accent} />
+                </View>
+                <Text style={styles.featureTitle}>Fast</Text>
+                <Text style={styles.featureDescription}>
+                  Instant transfers and payments
+                </Text>
               </View>
-              <Text style={styles.featureText}>Bank-Grade Security</Text>
-            </View>
-            <View style={styles.featureItem}>
-              <View style={styles.featureIcon}>
-                <Ionicons name="globe" size={20} color="#FFFFFF" />
+              <View style={styles.featureItem}>
+                <View style={[styles.featureIcon, { backgroundColor: colors.success + '20' }]}>
+                  <Ionicons name="globe" size={24} color={colors.success} />
+                </View>
+                <Text style={styles.featureTitle}>Global</Text>
+                <Text style={styles.featureDescription}>
+                  Send money worldwide
+                </Text>
               </View>
-              <Text style={styles.featureText}>Global Remittance</Text>
-            </View>
-          </Animated.View>
+            </Animated.View>
 
-          <Animated.View 
-            entering={FadeInDown.delay(800).duration(800)} 
-            style={[styles.buttonContainer, { paddingBottom: insets.bottom + 20 }]}
-          >
-            <Button
-              title="Get Started"
-              onPress={() => navigation.navigate('Register')}
-              size="lg"
-              fullWidth
-              style={styles.primaryButton}
-              gradient={false}
-            />
-            <Button
-              title="I already have an account"
-              variant="ghost"
-              onPress={() => navigation.navigate('Login')}
-              size="lg"
-              fullWidth
-              style={styles.secondaryButton}
-            />
-          </Animated.View>
-        </View>
+            {/* Stats Section */}
+            <Animated.View
+              entering={FadeInUp.duration(1200).delay(600)}
+              style={[
+                styles.statsSection,
+                {
+                  opacity: ctaOpacity,
+                  transform: [{ translateY: ctaTranslateY }]
+                }
+              ]}
+            >
+              <View style={styles.statItem}>
+                <Text style={styles.statNumber}>1M+</Text>
+                <Text style={styles.statLabel}>Users</Text>
+              </View>
+              <View style={styles.statItem}>
+                <Text style={styles.statNumber}>99.9%</Text>
+                <Text style={styles.statLabel}>Uptime</Text>
+              </View>
+              <View style={styles.statItem}>
+                <Text style={styles.statNumber}>50+</Text>
+                <Text style={styles.statLabel}>Countries</Text>
+              </View>
+            </Animated.View>
+
+            {/* CTA Section */}
+            <Animated.View
+              entering={FadeInUp.duration(1200).delay(800)}
+              style={[
+                styles.ctaSection,
+                {
+                  opacity: ctaOpacity,
+                  transform: [{ translateY: ctaTranslateY }]
+                }
+              ]}
+            >
+              <Text style={styles.ctaTitle}>
+                Ready to get started?
+              </Text>
+              <Text style={styles.ctaSubtitle}>
+                Join thousands of users who trust SikaRemit for their financial needs
+              </Text>
+              <View style={styles.buttonRow}>
+                <Button
+                  title="Sign Up"
+                  onPress={handleGetStarted}
+                  variant="outline"
+                  size="lg"
+                  style={styles.ctaButton}
+                />
+                <Button
+                  title="Sign In"
+                  onPress={handleSignIn}
+                  gradient={true}
+                  size="lg"
+                  style={styles.ctaButton}
+                />
+              </View>
+            </Animated.View>
+
+            {/* Footer */}
+            <Animated.View
+              entering={FadeInUp.duration(1200).delay(1000)}
+              style={styles.footer}
+            >
+              <Text style={styles.footerText}>
+                © 2024 SikaRemit. All rights reserved.
+              </Text>
+              <View style={styles.footerLinks}>
+                <TouchableOpacity>
+                  <Text style={styles.footerLink}>Privacy Policy</Text>
+                </TouchableOpacity>
+                <TouchableOpacity>
+                  <Text style={styles.footerLink}>Terms of Service</Text>
+                </TouchableOpacity>
+              </View>
+            </Animated.View>
+
+            <View style={{ height: Spacing.xxxl }} />
+          </View>
+        </ScrollView>
       </LinearGradient>
     </View>
   );
@@ -101,88 +247,143 @@ const styles = StyleSheet.create({
   gradient: {
     flex: 1,
   },
-  content: {
+  scrollView: {
     flex: 1,
-    paddingHorizontal: Spacing.lg,
-    justifyContent: 'space-between',
   },
-  logoContainer: {
+  content: {
+    flexGrow: 1,
+  },
+  header: {
     alignItems: 'center',
+    marginBottom: Spacing.xl,
   },
-  logoCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#FFFFFF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: Spacing.md,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.2,
-    shadowRadius: 16,
-    elevation: 8,
-  },
-  logoText: {
-    fontSize: FontSize.xxxl,
-    fontWeight: FontWeight.bold,
+  appTitle: {
+    fontSize: FontSize.display,
+    fontWeight: FontWeight.black as any,
     color: '#FFFFFF',
-    letterSpacing: 1,
+    textTransform: 'uppercase',
+    letterSpacing: 3,
+    marginBottom: Spacing.xs,
   },
-  tagline: {
-    fontSize: FontSize.sm,
-    color: 'rgba(255, 255, 255, 0.8)',
-    marginTop: Spacing.xs,
+  appTagline: {
+    fontSize: FontSize.md,
+    color: 'rgba(255,255,255,0.9)',
+    fontWeight: FontWeight.medium as any,
   },
   heroSection: {
     alignItems: 'center',
-    paddingHorizontal: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+    marginBottom: Spacing.xxxl,
   },
   heroTitle: {
     fontSize: FontSize.display,
-    fontWeight: FontWeight.bold,
+    fontWeight: FontWeight.black as any,
     color: '#FFFFFF',
     textAlign: 'center',
-    lineHeight: 48,
+    lineHeight: 50,
+    marginBottom: Spacing.md,
   },
   heroSubtitle: {
-    fontSize: FontSize.md,
-    color: 'rgba(255, 255, 255, 0.85)',
+    fontSize: FontSize.lg,
+    color: 'rgba(255,255,255,0.8)',
     textAlign: 'center',
-    marginTop: Spacing.md,
     lineHeight: 24,
+    paddingHorizontal: Spacing.lg,
   },
   features: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingHorizontal: Spacing.sm,
+    paddingHorizontal: Spacing.lg,
+    marginBottom: Spacing.xxxl,
   },
   featureItem: {
     alignItems: 'center',
+    marginBottom: Spacing.lg,
   },
   featureIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    justifyContent: 'center',
+    width: ComponentSize.avatar.lg,
+    height: ComponentSize.avatar.lg,
+    borderRadius: BorderRadius.full,
     alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: Spacing.sm,
   },
-  featureText: {
-    fontSize: FontSize.xs,
+  featureTitle: {
+    fontSize: FontSize.lg,
+    fontWeight: FontWeight.semibold as any,
     color: '#FFFFFF',
-    fontWeight: FontWeight.medium,
+    marginBottom: Spacing.xs,
+  },
+  featureDescription: {
+    fontSize: FontSize.sm,
+    color: 'rgba(255,255,255,0.7)',
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+  statsSection: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    paddingHorizontal: Spacing.lg,
+    marginBottom: Spacing.xxxl,
+  },
+  statItem: {
+    alignItems: 'center',
+  },
+  statNumber: {
+    fontSize: FontSize.xxxl,
+    fontWeight: FontWeight.black as any,
+    color: '#FFFFFF',
+    marginBottom: Spacing.xs,
+  },
+  statLabel: {
+    fontSize: FontSize.sm,
+    color: 'rgba(255,255,255,0.7)',
+    fontWeight: FontWeight.medium as any,
+  },
+  ctaSection: {
+    alignItems: 'center',
+    paddingHorizontal: Spacing.lg,
+    marginBottom: Spacing.xxxl,
+  },
+  ctaTitle: {
+    fontSize: FontSize.xl,
+    fontWeight: FontWeight.bold as any,
+    color: '#FFFFFF',
+    marginBottom: Spacing.sm,
     textAlign: 'center',
   },
-  buttonContainer: {
+  ctaSubtitle: {
+    fontSize: FontSize.md,
+    color: 'rgba(255,255,255,0.8)',
+    textAlign: 'center',
+    marginBottom: Spacing.lg,
+    paddingHorizontal: Spacing.lg,
+  },
+  buttonRow: {
+    flexDirection: 'row',
     gap: Spacing.md,
+    width: '100%',
+    maxWidth: 300,
   },
-  primaryButton: {
-    backgroundColor: '#FFFFFF',
+  ctaButton: {
+    flex: 1,
   },
-  secondaryButton: {
-    borderColor: 'rgba(255, 255, 255, 0.3)',
+  footer: {
+    alignItems: 'center',
+    paddingHorizontal: Spacing.lg,
+    marginBottom: Spacing.lg,
+  },
+  footerText: {
+    fontSize: FontSize.sm,
+    color: 'rgba(255,255,255,0.6)',
+    marginBottom: Spacing.sm,
+  },
+  footerLinks: {
+    flexDirection: 'row',
+    gap: Spacing.lg,
+  },
+  footerLink: {
+    fontSize: FontSize.sm,
+    color: 'rgba(255,255,255,0.8)',
+    textDecorationLine: 'underline',
   },
 });
 

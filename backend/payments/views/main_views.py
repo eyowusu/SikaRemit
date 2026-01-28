@@ -356,7 +356,9 @@ class TransactionViewSet(viewsets.ModelViewSet):
         user = self.request.user
         if user.user_type == 2:  # merchant
             return Transaction.objects.filter(merchant__user=user)
-        return Transaction.objects.filter(customer__user=user)
+        elif user.user_type == 3:  # customer
+            return Transaction.objects.filter(customer__user=user)
+        return Transaction.objects.none()  # Return empty queryset for other user types
 
     @action(detail=False, methods=['post'])
     @validate_payment_method
@@ -1473,21 +1475,6 @@ class USSDTransactionViewSet(viewsets.ModelViewSet):
     queryset = USSDTransaction.objects.all()
     serializer_class = USSDTransactionSerializer
     permission_classes = [IsAdminUser]
-
-class TransactionViewSet(viewsets.ModelViewSet):
-    queryset = Transaction.objects.all()
-    serializer_class = TransactionSerializer
-    permission_classes = [IsAuthenticated]
-    authentication_classes = [JWTAuthentication]
-    throttle_classes = [EndpointThrottle]
-
-    def get_queryset(self):
-        user = self.request.user
-        if user.user_type == 1:  # admin
-            return Transaction.objects.all()
-        elif user.user_type == 2:  # merchant
-            return Transaction.objects.filter(merchant__user=user)
-        return Transaction.objects.filter(customer__user=user)
 
 class CrossBorderRemittanceViewSet(viewsets.ModelViewSet):
     """

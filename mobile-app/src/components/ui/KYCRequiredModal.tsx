@@ -72,7 +72,7 @@ const KYCRequiredModal: React.FC<KYCRequiredModalProps> = ({
       onRequestClose={onClose}
     >
       <View style={styles.overlay}>
-        <View style={[styles.modalContainer, { backgroundColor: colors.card }]}>
+        <View style={[styles.modalContainer, { backgroundColor: colors.surface }]}>
           {/* Close Button */}
           <TouchableOpacity style={styles.closeButton} onPress={onClose}>
             <Ionicons name="close" size={24} color={colors.textMuted} />
@@ -174,7 +174,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: FontSize.xl,
-    fontWeight: FontWeight.bold,
+    fontWeight: FontWeight.bold as any,
     textAlign: 'center',
     marginBottom: Spacing.sm,
   },
@@ -213,14 +213,14 @@ const styles = StyleSheet.create({
   actionButtonText: {
     color: '#FFFFFF',
     fontSize: FontSize.md,
-    fontWeight: FontWeight.semibold,
+    fontWeight: FontWeight.semibold as any,
   },
   laterButton: {
     padding: Spacing.sm,
   },
   laterButtonText: {
     fontSize: FontSize.sm,
-    fontWeight: FontWeight.medium,
+    fontWeight: FontWeight.medium as any,
   },
 });
 

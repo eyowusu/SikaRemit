@@ -51,28 +51,29 @@ export default function AdminOverviewPage() {
   }
 
   return (
-    <div className="w-full space-y-8">
+    <div className="w-full space-y-6 sm:space-y-8">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-600 via-purple-500 to-pink-500 bg-clip-text text-transparent flex items-center gap-3">
-              <LayoutDashboard className="h-8 w-8 text-purple-600" />
+            <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-purple-600 via-purple-500 to-pink-500 bg-clip-text text-transparent flex items-center gap-2 sm:gap-3">
+              <LayoutDashboard className="h-6 w-6 sm:h-8 sm:w-8 text-purple-600" />
               Overview Dashboard
             </h1>
-            <p className="text-slate-600 mt-1 text-base">
+            <p className="text-slate-600 dark:text-slate-400 mt-1 text-sm sm:text-base">
               Quick platform overview and key metrics
             </p>
           </div>
-          <div className="flex gap-3">
+          <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
             <Link href="/admin/analytics">
-              <Button variant="outline" className="bg-white/50 backdrop-blur-sm border-white/30 hover:bg-white/70 hover:border-purple-200/50 shadow-lg shadow-purple-500/5 transition-all duration-300">
+              <Button variant="outline" className="bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm border-white/30 dark:border-slate-700/30 hover:bg-white/70 dark:hover:bg-slate-900/70 hover:border-purple-200/50 dark:hover:border-purple-700/50 shadow-lg shadow-purple-500/5 transition-all duration-300 w-full sm:w-auto">
                 <BarChart3 className="h-4 w-4 mr-2" />
-                Advanced Analytics
+                <span className="hidden sm:inline">Advanced Analytics</span>
+                <span className="sm:hidden">Analytics</span>
               </Button>
             </Link>
             <button
               onClick={() => window.location.reload()}
-              className="px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-500 text-white rounded-xl hover:shadow-xl hover:shadow-purple-500/25 transition-all duration-300 hover:scale-105"
+              className="px-4 sm:px-6 py-2 sm:py-3 bg-gradient-to-r from-purple-600 to-pink-500 text-white rounded-xl hover:shadow-xl hover:shadow-purple-500/25 transition-all duration-300 hover:scale-105 w-full sm:w-auto"
             >
               Refresh
             </button>
@@ -80,29 +81,29 @@ export default function AdminOverviewPage() {
         </div>
 
         {/* Real-time Statistics */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6" data-testid="real-time-stats">
-          <Card data-testid="active-users" className="bg-white/40 backdrop-blur-xl border-white/30 shadow-xl shadow-purple-500/5 hover:shadow-2xl hover:shadow-purple-500/10 transition-all duration-500 hover:bg-white/50 hover:scale-[1.02]">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6" data-testid="real-time-stats">
+          <Card data-testid="active-users" className="bg-white/40 dark:bg-slate-900/40 backdrop-blur-sm border-white/30 dark:border-slate-700/30 shadow-lg shadow-purple-500/5 hover:shadow-xl hover:shadow-purple-500/10 transition-all duration-500 hover:bg-white/50 dark:hover:bg-slate-900/50 hover:scale-[1.02]">
             <CardHeader className="pb-3">
-              <CardTitle className="text-base font-semibold text-slate-900">Active Users</CardTitle>
+              <CardTitle className="text-sm sm:text-base font-semibold text-slate-900 dark:text-slate-100">Active Users</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-purple-600">{overview.active_users}</div>
-              <p className="text-sm text-slate-600 mt-1">Currently online</p>
+              <div className="text-xl sm:text-2xl font-bold text-purple-600">{overview.active_users}</div>
+              <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mt-1">Currently online</p>
             </CardContent>
           </Card>
-          <Card data-testid="transaction-volume" className="bg-white/40 backdrop-blur-xl border-white/30 shadow-xl shadow-purple-500/5 hover:shadow-2xl hover:shadow-purple-500/10 transition-all duration-500 hover:bg-white/50 hover:scale-[1.02]">
+          <Card data-testid="transaction-volume" className="bg-white/40 dark:bg-slate-900/40 backdrop-blur-sm border-white/30 dark:border-slate-700/30 shadow-lg shadow-purple-500/5 hover:shadow-xl hover:shadow-purple-500/10 transition-all duration-500 hover:bg-white/50 dark:hover:bg-slate-900/50 hover:scale-[1.02]">
             <CardHeader className="pb-3">
-              <CardTitle className="text-base font-semibold text-slate-900">Transaction Volume</CardTitle>
+              <CardTitle className="text-sm sm:text-base font-semibold text-slate-900 dark:text-slate-100">Transaction Volume</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-purple-600">{overview.total_transactions}</div>
-              <p className="text-sm text-slate-600 mt-1">Total processed</p>
+              <div className="text-xl sm:text-2xl font-bold text-purple-600">{overview.total_transactions}</div>
+              <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mt-1">Total processed</p>
             </CardContent>
           </Card>
         </div>
 
         {/* Key Metrics */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
           <Card className="bg-white/40 backdrop-blur-xl border-white/30 shadow-xl shadow-purple-500/5 hover:shadow-2xl hover:shadow-purple-500/10 transition-all duration-500 hover:bg-white/50 hover:scale-[1.02]">
             <CardHeader className="pb-4">
               <div className="flex items-center justify-between">

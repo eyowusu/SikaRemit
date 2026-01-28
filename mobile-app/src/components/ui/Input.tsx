@@ -1,153 +1,249 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   View,
-  TextInput,
   Text,
   StyleSheet,
-  TouchableOpacity,
+  TextInput,
   TextInputProps,
   ViewStyle,
+  TextStyle,
+  Animated,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import Animated, { useAnimatedStyle, withTiming, useSharedValue } from 'react-native-reanimated';
 import { useTheme } from '../../context/ThemeContext';
-import { BorderRadius, FontSize, Spacing } from '../../constants/theme';
+import { BorderRadius, FontSize, FontWeight, Spacing, Shadow, ComponentSize, AnimationConfig } from '../../constants/theme';
 
 interface InputProps extends TextInputProps {
   label?: string;
   error?: string;
-  leftIcon?: keyof typeof Ionicons.glyphMap;
-  rightIcon?: keyof typeof Ionicons.glyphMap;
-  onRightIconPress?: () => void;
-  containerStyle?: ViewStyle;
+  helperText?: string;
+  leftIcon?: React.ReactNode;
+  rightIcon?: React.ReactNode;
+  variant?: 'default' | 'glass' | 'minimal';
+  size?: 'sm' | 'md' | 'lg';
+  animated?: boolean;
 }
 
 const Input: React.FC<InputProps> = ({
   label,
   error,
+  helperText,
   leftIcon,
   rightIcon,
-  onRightIconPress,
-  containerStyle,
-  secureTextEntry,
+  variant = 'default',
+  size = 'md',
+  animated = true,
+  style,
+  value,
   onFocus,
   onBlur,
   ...props
 }) => {
   const { colors } = useTheme();
-  const [isFocused, setIsFocused] = useState(false);
-  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
-  const borderColor = useSharedValue(colors.border);
+  const [isFocused, setIsFocused] = React.useState(false);
+  const animatedValue = React.useRef(new Animated.Value(0)).current;
 
-  const animatedBorderStyle = useAnimatedStyle(() => ({
-    borderColor: withTiming(borderColor.value, { duration: 200 }),
-  }));
+  React.useEffect(() => {
+    if (animated) {
+      Animated.timing(animatedValue, {
+        toValue: isFocused ? 1 : 0,
+        duration: AnimationConfig.timing.normal,
+        useNativeDriver: false,
+      }).start();
+    }
+  }, [isFocused, animated]);
 
   const handleFocus = (e: any) => {
     setIsFocused(true);
-    borderColor.value = colors.primary;
     onFocus?.(e);
   };
 
   const handleBlur = (e: any) => {
     setIsFocused(false);
-    borderColor.value = error ? colors.error : colors.border;
     onBlur?.(e);
   };
 
-  const togglePasswordVisibility = () => {
-    setIsPasswordVisible(!isPasswordVisible);
+  const getSizeStyles = (): { container: ViewStyle; input: TextStyle } => {
+    switch (size) {
+      case 'sm':
+        return {
+          container: { height: ComponentSize.inputHeight.sm },
+          input: { fontSize: FontSize.sm },
+        };
+      case 'lg':
+        return {
+          container: { height: ComponentSize.inputHeight.lg },
+          input: { fontSize: FontSize.lg },
+        };
+      default:
+        return {
+          container: { height: ComponentSize.inputHeight.md },
+          input: { fontSize: FontSize.md },
+        };
+    }
+  };
+
+  const getVariantStyles = (): { container: ViewStyle; input: TextStyle } => {
+    const borderColor = error ? colors.error : isFocused ? colors.primary : colors.border;
+    const backgroundColor = variant === 'glass' ? colors.glass.background : colors.surface;
+
+    switch (variant) {
+      case 'glass':
+        return {
+          container: {
+            backgroundColor,
+            borderWidth: 1,
+            borderColor: colors.glass.border,
+            ...Shadow.glass,
+          },
+          input: {
+            color: colors.text,
+          },
+        };
+      case 'minimal':
+        return {
+          container: {
+            backgroundColor: 'transparent',
+            borderBottomWidth: 2,
+            borderBottomColor: borderColor,
+            borderRadius: 0,
+          },
+          input: {
+            color: colors.text,
+          },
+        };
+      default:
+        return {
+          container: {
+            backgroundColor,
+            borderWidth: 1,
+            borderColor,
+            ...Shadow.card,
+          },
+          input: {
+            color: colors.text,
+          },
+        };
+    }
+  };
+
+  const sizeStyles = getSizeStyles();
+  const variantStyles = getVariantStyles();
+
+  const animatedBorderColor = animatedValue.interpolate({
+    inputRange: [0, 1],
+    outputRange: [colors.border, colors.primary],
+  });
+
+  const animatedShadow = animatedValue.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 8],
+  });
+
+  const containerStyle = {
+    ...styles.container,
+    ...sizeStyles.container,
+    ...variantStyles.container,
+    ...(animated && {
+      borderColor: variant === 'minimal' ? undefined : animatedBorderColor,
+      shadowOpacity: animatedShadow,
+    }),
+  };
+
+  const inputStyle: TextStyle = {
+    ...styles.input,
+    ...sizeStyles.input,
+    ...variantStyles.input,
   };
 
   return (
-    <View style={[styles.container, containerStyle]}>
+    <View style={styles.wrapper}>
       {label && (
-        <Text style={[styles.label, { color: colors.text }]}>{label}</Text>
+        <Text style={[styles.label, { color: colors.textSecondary }]}>
+          {label}
+        </Text>
       )}
-      <Animated.View
-        style={[
-          styles.inputContainer,
-          {
-            backgroundColor: colors.surface,
-            borderColor: error ? colors.error : colors.border,
-          },
-          animatedBorderStyle,
-        ]}
-      >
+      
+      <Animated.View style={[containerStyle, style]}>
         {leftIcon && (
-          <Ionicons
-            name={leftIcon}
-            size={20}
-            color={isFocused ? colors.primary : colors.textMuted}
-            style={styles.leftIcon}
-          />
+          <View style={styles.leftIcon}>
+            {leftIcon}
+          </View>
         )}
+        
         <TextInput
-          style={[
-            styles.input,
-            {
-              color: colors.text,
-              flex: 1,
-            },
-          ]}
+          style={[inputStyle, leftIcon ? { paddingLeft: 0 } : undefined]}
           placeholderTextColor={colors.textMuted}
           onFocus={handleFocus}
           onBlur={handleBlur}
-          secureTextEntry={secureTextEntry && !isPasswordVisible}
+          value={value}
           {...props}
         />
-        {secureTextEntry && (
-          <TouchableOpacity onPress={togglePasswordVisibility} style={styles.rightIcon}>
-            <Ionicons
-              name={isPasswordVisible ? 'eye-off-outline' : 'eye-outline'}
-              size={20}
-              color={colors.textMuted}
-            />
-          </TouchableOpacity>
-        )}
-        {rightIcon && !secureTextEntry && (
-          <TouchableOpacity onPress={onRightIconPress} style={styles.rightIcon}>
-            <Ionicons name={rightIcon} size={20} color={colors.textMuted} />
-          </TouchableOpacity>
+        
+        {rightIcon && (
+          <View style={styles.rightIcon}>
+            {rightIcon}
+          </View>
         )}
       </Animated.View>
+      
       {error && (
-        <Text style={[styles.error, { color: colors.error }]}>{error}</Text>
+        <Text style={[styles.errorText, { color: colors.error }]}>
+          {error}
+        </Text>
+      )}
+      
+      {helperText && !error && (
+        <Text style={[styles.helperText, { color: colors.textMuted }]}>
+          {helperText}
+        </Text>
       )}
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
+  wrapper: {
     marginBottom: Spacing.md,
+  },
+  container: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: BorderRadius.md,
+    paddingHorizontal: Spacing.md,
+    position: 'relative',
+  },
+  input: {
+    flex: 1,
+    fontWeight: FontWeight.normal as any,
+    paddingVertical: Spacing.sm,
   },
   label: {
     fontSize: FontSize.sm,
-    fontWeight: '500',
-    marginBottom: Spacing.sm,
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderRadius: BorderRadius.xl,
-    paddingHorizontal: Spacing.md,
-    height: 52,
-  },
-  input: {
-    fontSize: FontSize.md,
-    paddingVertical: 0,
+    fontWeight: FontWeight.medium as any,
+    marginBottom: Spacing.xs,
+    letterSpacing: 0.3,
   },
   leftIcon: {
     marginRight: Spacing.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   rightIcon: {
-    padding: Spacing.xs,
+    marginLeft: Spacing.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  error: {
+  errorText: {
     fontSize: FontSize.xs,
+    fontWeight: FontWeight.medium as any,
     marginTop: Spacing.xs,
+    letterSpacing: 0.2,
+  },
+  helperText: {
+    fontSize: FontSize.xs,
+    fontWeight: FontWeight.normal as any,
+    marginTop: Spacing.xs,
+    letterSpacing: 0.2,
   },
 });
 

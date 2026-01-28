@@ -1,14 +1,21 @@
 import logging
 from django.db import models
 from django.db.models import Sum, Count, Avg, Max, Min, Q, F
+from django.db.models.functions import TruncHour, TruncDate
 from django.utils import timezone
 from decimal import Decimal
 from datetime import timedelta, datetime
 from typing import Dict, List, Any, Optional
-from .models import (
-    Payment, Transaction, CrossBorderRemittance, AnalyticsMetric,
-    DashboardSnapshot, MerchantAnalytics, TransactionAnalytics, PerformanceAlert
-)
+from payments.models import Payment, Transaction, CrossBorderRemittance
+# Import analytics models if they exist, otherwise use defaults
+try:
+    from payments.models import AnalyticsMetric, DashboardSnapshot, MerchantAnalytics, TransactionAnalytics, PerformanceAlert
+except ImportError:
+    AnalyticsMetric = None
+    DashboardSnapshot = None
+    MerchantAnalytics = None
+    TransactionAnalytics = None
+    PerformanceAlert = None
 
 logger = logging.getLogger(__name__)
 
@@ -39,15 +46,12 @@ class AnalyticsService:
         # Combine all transaction types
         total_transaction_count = transactions.count() + remittances.count()
         total_transaction_value = (
-            transactions.aggregate(total=Sum('amount'))['total'] or 0 +
-            remittances.aggregate(total=Sum('amount_sent'))['total'] or 0
+            (transactions.aggregate(total=Sum('amount'))['total'] or 0) +
+            (remittances.aggregate(total=Sum('amount_sent'))['total'] or 0)
         )
 
-        # Fee revenue calculation
-        fee_revenue = (
-            transactions.aggregate(total=Sum('fee_amount'))['total'] or 0 +
-            remittances.aggregate(total=Sum('fee'))['total'] or 0
-        )
+        # Fee revenue calculation (Transaction model doesn't have fee_amount, estimate from total)
+        fee_revenue = (remittances.aggregate(total=Sum('fee'))['total'] or 0)
 
         # User metrics
         from users.models import Customer, Merchant
@@ -58,10 +62,10 @@ class AnalyticsService:
             user__last_login__date__gte=date - timedelta(days=30)
         ).count()
 
-        # New registrations today
+        # New registrations today (using user__date_joined as Customer/Merchant don't have created_at)
         new_registrations = (
-            Customer.objects.filter(created_at__date=date).count() +
-            Merchant.objects.filter(created_at__date=date).count()
+            Customer.objects.filter(user__date_joined__date=date).count() +
+            Merchant.objects.filter(user__date_joined__date=date).count()
         )
 
         # Success/failure rates
@@ -488,23 +492,23 @@ class AnalyticsService:
 
         since = timezone.now() - timedelta(days=days)
 
-        # Transaction trends
+        # Transaction trends (using TruncDate for SQLite compatibility)
         daily_transactions = Transaction.objects.filter(
             merchant=merchant,
             created_at__gte=since
-        ).extra(
-            select={'date': 'DATE(created_at)'}
+        ).annotate(
+            date=TruncDate('created_at')
         ).values('date').annotate(
             count=Count('id'),
             revenue=Sum('amount')
         ).order_by('date')
 
-        # Customer growth
+        # Customer growth (using TruncDate for SQLite compatibility)
         customer_growth = Transaction.objects.filter(
             merchant=merchant,
             created_at__gte=since
-        ).extra(
-            select={'date': 'DATE(created_at)'}
+        ).annotate(
+            date=TruncDate('created_at')
         ).values('date').annotate(
             unique_customers=Count('customer', distinct=True)
         ).order_by('date')
@@ -615,12 +619,12 @@ class AnalyticsService:
         end_date = timezone.now()
         start_date = end_date - timedelta(days=days)
 
-        # Daily transaction data
+        # Daily transaction data (using Django's TruncDate for SQLite compatibility)
         daily_data = Transaction.objects.filter(
             created_at__gte=start_date,
             created_at__lte=end_date
-        ).extra(
-            select={'date': "DATE(created_at)"}
+        ).annotate(
+            date=TruncDate('created_at')
         ).values('date').annotate(
             count=Count('id'),
             volume=Sum('amount'),
@@ -628,11 +632,11 @@ class AnalyticsService:
             failed_count=Count('id', filter=Q(status='failed'))
         ).order_by('date')
 
-        # Hourly data for last 7 days
+        # Hourly data for last 7 days (using Django's TruncHour for SQLite compatibility)
         hourly_data = Transaction.objects.filter(
             created_at__gte=end_date - timedelta(days=7)
-        ).extra(
-            select={'hour': "DATE_TRUNC('hour', created_at)"}
+        ).annotate(
+            hour=TruncHour('created_at')
         ).values('hour').annotate(
             count=Count('id'),
             volume=Sum('amount')

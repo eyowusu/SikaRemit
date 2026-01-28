@@ -3,7 +3,8 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     StoreViewSet, ProductViewSet, onboarding_status, upload_verification,
     MerchantDashboardViewSet, MerchantApplicationViewSet, MerchantInvitationViewSet,
-    validate_invitation_token, accept_invitation, ReportTemplateViewSet, ReportViewSet, ScheduledReportViewSet, MerchantCustomerViewSet, MerchantTransactionViewSet, MerchantNotificationViewSet, MerchantAnalyticsViewSet, MerchantInvoiceViewSet, MerchantSettingsViewSet
+    validate_invitation_token, accept_invitation, ReportTemplateViewSet, ReportViewSet, ScheduledReportViewSet, MerchantCustomerViewSet, MerchantTransactionViewSet, MerchantNotificationViewSet, MerchantAnalyticsViewSet, MerchantInvoiceViewSet, MerchantSettingsViewSet,
+    simple_merchant_transactions, simple_merchant_transactions_stats
 )
 
 router = DefaultRouter()
@@ -27,4 +28,8 @@ urlpatterns = [
     path('onboarding/verify/', upload_verification, name='upload-verification'),
     path('invitations/validate/<uuid:token>/', validate_invitation_token, name='validate-invitation-token'),
     path('invitations/accept/<uuid:token>/', accept_invitation, name='accept-invitation'),
+    
+    # Simple test endpoints
+    path('transactions/simple/', simple_merchant_transactions, name='simple-merchant-transactions'),
+    path('transactions/simple/stats/', simple_merchant_transactions_stats, name='simple-merchant-transactions-stats'),
 ] + router.urls

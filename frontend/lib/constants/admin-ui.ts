@@ -1,5 +1,7 @@
 import {
+  AlertTriangle,
   BarChart3,
+  Bell,
   Building2,
   CreditCard,
   DollarSign,
@@ -65,6 +67,11 @@ export const ADMIN_NAVIGATION_ITEMS = [
     icon: Webhook,
   },
   {
+    title: 'Notifications',
+    href: '/admin/notifications',
+    icon: Bell,
+  },
+  {
     title: 'Audit Logs',
     href: '/admin/audit-logs',
     icon: ScrollText,
@@ -73,6 +80,11 @@ export const ADMIN_NAVIGATION_ITEMS = [
     title: 'Transactions',
     href: '/admin/transactions',
     icon: CreditCard,
+  },
+  {
+    title: 'Disputes',
+    href: '/admin/disputes',
+    icon: AlertTriangle,
   },
   {
     title: 'USSD',

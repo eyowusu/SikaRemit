@@ -102,7 +102,7 @@ export const SkeletonAvatar: React.FC<{ size?: number }> = ({ size = 48 }) => {
 export const SkeletonCard: React.FC = () => {
   const { colors } = useTheme();
   return (
-    <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
+    <View style={[styles.card, { backgroundColor: colors.surface, borderColor: '#E5E7EB' }]}>
       <View style={styles.cardHeader}>
         <SkeletonAvatar size={44} />
         <View style={styles.cardHeaderText}>

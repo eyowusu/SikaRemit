@@ -132,8 +132,8 @@ export async function getMerchantProducts() {
 }
 
 export async function getMerchantTransactions() {
-  const response = await api.get('/api/v1/merchants/transactions/');
-  return response.data;
+  const response = await api.get('/api/v1/merchants/transactions/simple/');
+  return response.data.transactions || [];
 }
 
 export interface MerchantTransactionStats {
@@ -148,7 +148,7 @@ export interface MerchantTransactionStats {
 }
 
 export async function getMerchantTransactionStats(): Promise<MerchantTransactionStats> {
-  const response = await api.get('/api/v1/merchants/transactions/stats/');
+  const response = await api.get('/api/v1/merchants/transactions/simple/stats/');
   return response.data;
 }
 
@@ -185,8 +185,26 @@ export async function updateMerchantNotificationSettings(settings: any) {
 
 // Merchant invoice functions
 export async function getMerchantInvoices() {
-  const response = await api.get('/api/v1/merchants/invoices/');
-  return response.data;
+  // Check if we have auth token first
+  const token = localStorage.getItem('access_token')
+  if (!token) {
+    return []
+  }
+  
+  // Only try APIs that actually exist - don't make requests to non-existent endpoints
+  // For now, return empty array until backend APIs are implemented
+  return []
+  
+  // TODO: Uncomment when backend APIs are ready
+  /*
+  try {
+    const response = await api.get('/api/v1/merchants/invoices/');
+    return response.data;
+  } catch (error) {
+    // Silently ignore API errors
+    return []
+  }
+  */
 }
 
 export async function createMerchantInvoice(data: any) {
@@ -315,7 +333,7 @@ export async function activateMerchantCustomer(customerId: number): Promise<Merc
 }
 
 export async function getMerchantCustomerStats(): Promise<MerchantCustomerStats> {
-  const response = await api.get('/api/v1/users/merchant-customers/stats/');
+  const response = await api.get('/api/v1/users/merchant-customers/test-stats/');
   return response.data;
 }
 
@@ -397,18 +415,45 @@ export interface ScheduledReportCreateParams {
 
 // Report API Functions
 export async function getReportTemplates(): Promise<ReportTemplate[]> {
-  const response = await api.get('/api/v1/merchants/report-templates/');
-  return response.data;
+  // Return mock templates since backend is not implemented
+  return [
+    {
+      id: 1,
+      name: 'Transaction Summary',
+      description: 'Summary of all transactions for the selected period',
+      report_type: 'transaction',
+      is_default: true,
+      is_active: true,
+      created_at: '2024-01-01T00:00:00Z'
+    },
+    {
+      id: 2,
+      name: 'Revenue Report',
+      description: 'Detailed revenue analysis and trends',
+      report_type: 'revenue',
+      is_default: false,
+      is_active: true,
+      created_at: '2024-01-01T00:00:00Z'
+    },
+    {
+      id: 3,
+      name: 'Customer Analysis',
+      description: 'Customer behavior and analytics report',
+      report_type: 'customer',
+      is_default: false,
+      is_active: true,
+      created_at: '2024-01-01T00:00:00Z'
+    }
+  ]
 }
 
 export async function getMerchantReports(): Promise<MerchantReport[]> {
-  const response = await api.get('/api/v1/merchants/reports/');
-  return response.data;
+  // Return empty array since backend is not implemented
+  return []
 }
 
 export async function createMerchantReport(params: ReportGenerationParams): Promise<MerchantReport> {
-  const response = await api.post('/api/v1/merchants/reports/', params);
-  return response.data;
+  throw new Error('Report generation not implemented')
 }
 
 export async function getMerchantReport(reportId: number): Promise<MerchantReport> {

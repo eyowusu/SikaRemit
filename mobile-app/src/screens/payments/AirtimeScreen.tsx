@@ -9,17 +9,37 @@ import {
   Platform,
   Alert,
   Image,
+  Dimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import Animated, { FadeInDown } from 'react-native-reanimated';
+import { LinearGradient } from 'expo-linear-gradient';
+import * as Haptics from 'expo-haptics';
+import Animated, { 
+  FadeInDown, 
+  FadeInUp,
+  FadeInRight,
+  useSharedValue, 
+  useAnimatedStyle, 
+  withSpring,
+} from 'react-native-reanimated';
 import { Button, Input, Card } from '../../components/ui';
 import { useTheme } from '../../context/ThemeContext';
 import { useWalletStore } from '../../store/walletStore';
-import { BorderRadius, FontSize, FontWeight, Spacing } from '../../constants/theme';
+import { 
+  BorderRadius, 
+  FontSize, 
+  FontWeight, 
+  Spacing, 
+  Shadow, 
+  AnimationConfig, 
+  ComponentSize 
+} from '../../constants/theme';
 import { TelecomLogos, detectTelecom } from '../../assets/logos';
 import mobileMoneyService, { MobileMoneyNetwork } from '../../services/mobileMoneyService';
+
+const { width } = Dimensions.get('window');
 
 const AirtimeScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
@@ -98,28 +118,36 @@ const AirtimeScreen: React.FC = () => {
         : undefined;
 
       // Call real API
-      const response = await mobileMoneyService.buyAirtime({
+      await mobileMoneyService.buyAirtime({
         phone: phoneNumber,
         amount: parseFloat(amount),
         network,
-        paymentMethod,
-        paymentPhone,
+        paymentMethod: paymentMethod,
       });
 
-      if (response.success) {
-        Alert.alert(
-          'Success',
-          response.message || `GHS ${amount} airtime sent to ${phoneNumber}`,
-          [{ text: 'OK', onPress: () => navigation.goBack() }]
-        );
-      } else {
-        Alert.alert('Error', response.message || 'Failed to purchase airtime');
-      }
+      Alert.alert('Success', `Airtime of GHS ${amount} purchased successfully!`, [
+        { text: 'OK', onPress: () => navigation.goBack() },
+      ]);
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to purchase airtime');
+      Alert.alert('Error', error.response?.data?.message || 'Failed to purchase airtime');
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleNetworkSelect = (networkId: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setSelectedNetwork(networkId);
+  };
+
+  const handleQuickAmount = (value: number) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setAmount(value.toString());
+  };
+
+  const handlePaymentMethodSelect = (methodId: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setSelectedPaymentMethod(methodId);
   };
 
   return (
@@ -128,166 +156,205 @@ const AirtimeScreen: React.FC = () => {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <View style={[styles.header, { paddingTop: insets.top + Spacing.md }]}>
-          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-            <Ionicons name="arrow-back" size={24} color={colors.text} />
-          </TouchableOpacity>
-          <Text style={[styles.title, { color: colors.text }]}>Buy Airtime</Text>
-          <View style={{ width: 44 }} />
-        </View>
-
         <ScrollView
-          contentContainerStyle={styles.content}
-          keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
+          contentContainerStyle={[styles.contentContainer, { paddingTop: insets.top + Spacing.lg }]}
         >
-          <Animated.View entering={FadeInDown.delay(100).duration(600)}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>Select Network</Text>
-            <View style={styles.networksGrid}>
-              {networks.map((network) => (
-                <TouchableOpacity
-                  key={network.id}
-                  style={[
-                    styles.networkCard,
-                    { backgroundColor: colors.card, borderColor: colors.cardBorder },
-                    selectedNetwork === network.id && { borderColor: network.color, borderWidth: 2 },
-                  ]}
-                  onPress={() => setSelectedNetwork(network.id)}
-                >
-                  <Image source={network.logo} style={styles.networkLogoImage} resizeMode="contain" />
-                  <Text style={[styles.networkName, { color: colors.text }]}>{network.name}</Text>
-                  {selectedNetwork === network.id && (
-                    <View style={[styles.checkmark, { backgroundColor: network.color }]}>
-                      <Ionicons name="checkmark" size={12} color="#FFFFFF" />
-                    </View>
-                  )}
-                </TouchableOpacity>
-              ))}
-            </View>
+          {/* Header */}
+          <Animated.View entering={FadeInDown.duration(600)} style={styles.header}>
+            <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+              <Ionicons name="arrow-back" size={24} color={colors.text} />
+            </TouchableOpacity>
+            <Text style={[styles.title, { color: colors.text }]}>Buy Airtime</Text>
+            <View style={styles.placeholder} />
           </Animated.View>
 
-          <Animated.View entering={FadeInDown.delay(200).duration(600)} style={styles.section}>
-            <Input
-              label="Phone Number"
-              placeholder="Enter phone number"
-              value={phoneNumber}
-              onChangeText={setPhoneNumber}
-              keyboardType="phone-pad"
-              leftIcon="call-outline"
-            />
-          </Animated.View>
-
-          <Animated.View entering={FadeInDown.delay(300).duration(600)} style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>Amount (GHS)</Text>
-            <View style={styles.quickAmounts}>
-              {quickAmounts.map((amt) => (
-                <TouchableOpacity
-                  key={amt}
-                  style={[
-                    styles.quickAmountButton,
-                    { backgroundColor: colors.surfaceVariant },
-                    amount === amt.toString() && { backgroundColor: colors.primary },
-                  ]}
-                  onPress={() => setAmount(amt.toString())}
-                >
-                  <Text
-                    style={[
-                      styles.quickAmountText,
-                      { color: colors.text },
-                      amount === amt.toString() && { color: '#FFFFFF' },
-                    ]}
-                  >
-                    {amt}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-            <Input
-              placeholder="Or enter custom amount"
-              value={amount}
-              onChangeText={setAmount}
-              keyboardType="decimal-pad"
-              leftIcon="cash-outline"
-            />
-          </Animated.View>
-
-          <Animated.View entering={FadeInDown.delay(400).duration(600)} style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>Pay With</Text>
-            {paymentMethods.map((method) => (
-              <TouchableOpacity
-                key={method.id}
-                style={[
-                  styles.paymentMethodCard,
-                  { backgroundColor: colors.card, borderColor: colors.cardBorder },
-                  selectedPaymentMethod === method.id && { borderColor: colors.primary, borderWidth: 2 },
-                ]}
-                onPress={() => setSelectedPaymentMethod(method.id)}
-              >
-                {method.logo ? (
-                  <Image source={method.logo} style={styles.paymentMethodLogoImage} resizeMode="contain" />
-                ) : (
-                  <View style={[styles.paymentMethodIcon, { backgroundColor: colors.primary + '15' }]}>
-                    <Ionicons name={method.icon as any} size={20} color={colors.primary} />
-                  </View>
-                )}
-                <View style={styles.paymentMethodInfo}>
-                  <Text style={[styles.paymentMethodName, { color: colors.text }]}>{method.name}</Text>
-                  {method.id === 'wallet' && (
-                    <Text style={[styles.paymentMethodBalance, { color: colors.textSecondary }]}>
-                      Balance: GHS {method.balance?.toFixed(2)}
-                    </Text>
-                  )}
-                </View>
-                {selectedPaymentMethod === method.id && (
-                  <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
-                )}
-              </TouchableOpacity>
-            ))}
-          </Animated.View>
-
-          <Animated.View entering={FadeInDown.delay(500).duration(600)} style={styles.section}>
-            <Card>
-              <View style={styles.summaryRow}>
-                <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>Network</Text>
-                <Text style={[styles.summaryValue, { color: colors.text }]}>
-                  {networks.find((n) => n.id === selectedNetwork)?.name || '-'}
+          {/* Balance Card */}
+          <Animated.View entering={FadeInUp.duration(800).delay(200)} style={styles.section}>
+            <Card variant="default" padding="lg">
+              <View style={styles.balanceHeader}>
+                <Text style={[styles.balanceLabel, { color: colors.textSecondary }]}>
+                  Available Balance
                 </Text>
-              </View>
-              <View style={[styles.summaryRow, { borderTopWidth: 1, borderTopColor: colors.divider }]}>
-                <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>Phone</Text>
-                <Text style={[styles.summaryValue, { color: colors.text }]}>
-                  {phoneNumber || '-'}
-                </Text>
-              </View>
-              <View style={[styles.summaryRow, { borderTopWidth: 1, borderTopColor: colors.divider }]}>
-                <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>Payment Method</Text>
-                <Text style={[styles.summaryValue, { color: colors.text }]}>
-                  {paymentMethods.find((m) => m.id === selectedPaymentMethod)?.name || '-'}
-                </Text>
-              </View>
-              <View style={[styles.summaryRow, { borderTopWidth: 1, borderTopColor: colors.divider }]}>
-                <Text style={[styles.summaryLabel, { color: colors.text, fontWeight: FontWeight.semibold }]}>
-                  Total
-                </Text>
-                <Text style={[styles.summaryValue, { color: colors.primary, fontWeight: FontWeight.bold }]}>
-                  GHS {parseFloat(amount || '0').toFixed(2)}
+                <Text style={[styles.balanceAmount, { color: colors.text }]}>
+                  GHS {walletBalance.toLocaleString() || '0.00'}
                 </Text>
               </View>
             </Card>
           </Animated.View>
 
-          <Animated.View entering={FadeInDown.delay(600).duration(600)}>
-            <Button
-              title="Buy Airtime"
-              onPress={handlePurchase}
-              loading={isLoading}
-              fullWidth
-              size="lg"
-              icon={<Ionicons name="phone-portrait" size={20} color="#FFFFFF" />}
+          {/* Network Selection */}
+          <Animated.View entering={FadeInUp.duration(800).delay(400)} style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Select Network</Text>
+            <View style={styles.networksGrid}>
+              {networks.map((network, index) => (
+                <Animated.View
+                  key={network.id}
+                  entering={FadeInUp.duration(600).delay(600 + index * 100)}
+                >
+                  <TouchableOpacity
+                    style={[
+                      styles.networkCard,
+                      {
+                        backgroundColor: selectedNetwork === network.id 
+                          ? colors.primary + '15'
+                          : colors.surface,
+                        borderColor: selectedNetwork === network.id 
+                          ? colors.primary
+                          : colors.borderLight,
+                      }
+                    ]}
+                    onPress={() => handleNetworkSelect(network.id)}
+                  >
+                    <View style={[
+                      styles.networkLogo,
+                      { backgroundColor: network.color + '20' }
+                    ]}>
+                      <Image source={network.logo} style={styles.networkImage} />
+                    </View>
+                    <Text style={[styles.networkName, { color: colors.text }]}>
+                      {network.name}
+                    </Text>
+                  </TouchableOpacity>
+                </Animated.View>
+              ))}
+            </View>
+          </Animated.View>
+
+          {/* Phone Number Input */}
+          <Animated.View entering={FadeInUp.duration(800).delay(600)} style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Phone Number</Text>
+            <Input
+              placeholder="Enter phone number"
+              value={phoneNumber}
+              onChangeText={setPhoneNumber}
+              keyboardType="phone-pad"
+              leftIcon={<Ionicons name="phone-portrait" size={20} color={colors.textMuted} />}
+              variant="glass"
             />
           </Animated.View>
 
-          <View style={{ height: 100 }} />
+          {/* Amount Section */}
+          <Animated.View entering={FadeInUp.duration(800).delay(800)} style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Amount</Text>
+            <Card variant="default" padding="lg" style={styles.amountCard}>
+              <View style={styles.amountInputContainer}>
+                <Text style={[styles.currencySymbol, { color: colors.primary }]}>GHS</Text>
+                <Input
+                  placeholder="0.00"
+                  value={amount}
+                  onChangeText={setAmount}
+                  keyboardType="numeric"
+                  variant="minimal"
+                  size="lg"
+                  style={styles.amountInput}
+                  textAlign="right"
+                />
+              </View>
+            </Card>
+
+            {/* Quick Amounts */}
+            <View style={styles.quickAmountsContainer}>
+              <Text style={[styles.quickAmountsLabel, { color: colors.textSecondary }]}>
+                Quick amounts
+              </Text>
+              <View style={styles.quickAmountsGrid}>
+                {quickAmounts.map((value, index) => (
+                  <Animated.View
+                    key={value}
+                    entering={FadeInUp.duration(400).delay(1000 + index * 50)}
+                  >
+                    <TouchableOpacity
+                      style={[
+                        styles.quickAmountButton,
+                        { 
+                          backgroundColor: amount === value.toString() 
+                            ? colors.primary 
+                            : colors.surface 
+                        }
+                      ]}
+                      onPress={() => handleQuickAmount(value)}
+                    >
+                      <Text style={[
+                        styles.quickAmountText,
+                        { 
+                          color: amount === value.toString() 
+                            ? '#FFFFFF' 
+                            : colors.text 
+                        }
+                      ]}>
+                        {value}
+                      </Text>
+                    </TouchableOpacity>
+                  </Animated.View>
+                ))}
+              </View>
+            </View>
+          </Animated.View>
+
+          {/* Payment Method */}
+          <Animated.View entering={FadeInUp.duration(800).delay(1000)} style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Pay With</Text>
+            <View style={styles.paymentMethodsGrid}>
+              {paymentMethods.map((method, index) => (
+                <Animated.View
+                  key={method.id}
+                  entering={FadeInUp.duration(600).delay(1200 + index * 100)}
+                >
+                  <TouchableOpacity
+                    style={[
+                      styles.paymentMethodCard,
+                      {
+                        backgroundColor: selectedPaymentMethod === method.id 
+                          ? colors.primary + '15'
+                          : colors.surface,
+                        borderColor: selectedPaymentMethod === method.id 
+                          ? colors.primary
+                          : colors.borderLight,
+                      }
+                    ]}
+                    onPress={() => handlePaymentMethodSelect(method.id)}
+                  >
+                    <View style={[
+                      styles.paymentMethodIcon,
+                      { backgroundColor: method.color ? method.color + '20' : colors.primary + '20' }
+                    ]}>
+                      {method.logo ? (
+                        <Image source={method.logo} style={styles.paymentMethodLogo} />
+                      ) : (
+                        <Ionicons name={method.icon as any} size={20} color={method.color || colors.primary} />
+                      )}
+                    </View>
+                    <View style={styles.paymentMethodInfo}>
+                      <Text style={[styles.paymentMethodName, { color: colors.text }]}>
+                        {method.name}
+                      </Text>
+                      {method.balance !== undefined && (
+                        <Text style={[styles.paymentMethodBalance, { color: colors.textMuted }]}>
+                          GHS {method.balance.toLocaleString()}
+                        </Text>
+                      )}
+                    </View>
+                  </TouchableOpacity>
+                </Animated.View>
+              ))}
+            </View>
+          </Animated.View>
+
+          {/* Purchase Button */}
+          <Animated.View entering={FadeInUp.duration(800).delay(1200)} style={styles.section}>
+            <Button
+              title={`Buy Airtime GHS ${amount || '0.00'}`}
+              onPress={handlePurchase}
+              loading={isLoading}
+              disabled={!selectedNetwork || !phoneNumber || !amount || parseFloat(amount) <= 0}
+              gradient={true}
+              fullWidth={true}
+              size="lg"
+            />
+          </Animated.View>
+
+          <View style={{ height: Spacing.xxxl }} />
         </ScrollView>
       </View>
     </KeyboardAvoidingView>
@@ -298,139 +365,156 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  contentContainer: {
+    paddingBottom: Spacing.xxl,
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: Spacing.lg,
-    paddingBottom: Spacing.md,
+    marginBottom: Spacing.xl,
   },
   backButton: {
-    width: 44,
-    height: 44,
+    width: ComponentSize.iconButton.md,
+    height: ComponentSize.iconButton.md,
+    borderRadius: BorderRadius.full,
+    alignItems: 'center',
     justifyContent: 'center',
   },
   title: {
-    fontSize: FontSize.xl,
-    fontWeight: FontWeight.bold,
+    fontSize: FontSize.xxl,
+    fontWeight: FontWeight.bold as any,
   },
-  content: {
-    paddingHorizontal: Spacing.lg,
+  placeholder: {
+    width: ComponentSize.iconButton.md,
   },
   section: {
-    marginBottom: Spacing.lg,
+    paddingHorizontal: Spacing.lg,
+    marginBottom: Spacing.xl,
   },
   sectionTitle: {
     fontSize: FontSize.lg,
-    fontWeight: FontWeight.semibold,
+    fontWeight: FontWeight.semibold as any,
     marginBottom: Spacing.md,
+  },
+  balanceHeader: {
+    alignItems: 'center',
+  },
+  balanceLabel: {
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.medium as any,
+    marginBottom: Spacing.xs,
+  },
+  balanceAmount: {
+    fontSize: FontSize.xxxl,
+    fontWeight: FontWeight.bold as any,
   },
   networksGrid: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
     justifyContent: 'space-between',
-    marginBottom: Spacing.lg,
+    gap: Spacing.md,
   },
   networkCard: {
-    width: '48%',
+    flex: 1,
+    alignItems: 'center',
     padding: Spacing.md,
     borderRadius: BorderRadius.lg,
-    borderWidth: 1,
-    alignItems: 'center',
-    marginBottom: Spacing.md,
-    position: 'relative',
+    borderWidth: 2,
+    ...Shadow.card,
   },
   networkLogo: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-    justifyContent: 'center',
+    width: ComponentSize.avatar.md,
+    height: ComponentSize.avatar.md,
+    borderRadius: BorderRadius.md,
     alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: Spacing.sm,
   },
-  networkLogoText: {
-    fontSize: FontSize.lg,
-    fontWeight: FontWeight.bold,
-    color: '#FFFFFF',
-  },
-  networkLogoImage: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-    marginBottom: Spacing.sm,
+  networkImage: {
+    width: 32,
+    height: 32,
+    resizeMode: 'contain',
   },
   networkName: {
-    fontSize: FontSize.md,
-    fontWeight: FontWeight.medium,
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.semibold as any,
   },
-  checkmark: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    justifyContent: 'center',
+  amountCard: {
+    marginBottom: Spacing.lg,
+  },
+  amountInputContainer: {
+    flexDirection: 'row',
     alignItems: 'center',
   },
-  quickAmounts: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.sm,
+  currencySymbol: {
+    fontSize: FontSize.xxxl,
+    fontWeight: FontWeight.bold as any,
+    marginRight: Spacing.sm,
+  },
+  amountInput: {
+    flex: 1,
+    marginLeft: Spacing.sm,
+  },
+  quickAmountsContainer: {
+    marginTop: Spacing.lg,
+  },
+  quickAmountsLabel: {
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.medium as any,
     marginBottom: Spacing.md,
   },
+  quickAmountsGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
   quickAmountButton: {
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.full,
+    width: (width - Spacing.lg * 2 - Spacing.md * 5) / 6,
+    height: ComponentSize.buttonHeight.sm,
+    borderRadius: BorderRadius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'transparent',
   },
   quickAmountText: {
     fontSize: FontSize.sm,
-    fontWeight: FontWeight.medium,
+    fontWeight: FontWeight.semibold as any,
   },
-  summaryRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: Spacing.sm,
-  },
-  summaryLabel: {
-    fontSize: FontSize.md,
-  },
-  summaryValue: {
-    fontSize: FontSize.md,
+  paymentMethodsGrid: {
+    gap: Spacing.md,
   },
   paymentMethodCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: Spacing.md,
+    padding: Spacing.lg,
     borderRadius: BorderRadius.lg,
-    borderWidth: 1,
-    marginBottom: Spacing.sm,
+    borderWidth: 2,
+    ...Shadow.card,
   },
   paymentMethodIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    justifyContent: 'center',
+    width: ComponentSize.avatar.md,
+    height: ComponentSize.avatar.md,
+    borderRadius: BorderRadius.md,
     alignItems: 'center',
+    justifyContent: 'center',
     marginRight: Spacing.md,
+  },
+  paymentMethodLogo: {
+    width: 32,
+    height: 32,
+    resizeMode: 'contain',
   },
   paymentMethodInfo: {
     flex: 1,
   },
   paymentMethodName: {
     fontSize: FontSize.md,
-    fontWeight: FontWeight.medium,
+    fontWeight: FontWeight.semibold as any,
   },
   paymentMethodBalance: {
     fontSize: FontSize.sm,
     marginTop: 2,
-  },
-  paymentMethodLogoImage: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    marginRight: Spacing.md,
   },
 });
 

@@ -9,8 +9,7 @@ This document summarizes the current state of the mobile app's payment integrati
 ### Payment Services
 | Service | Status | Description |
 |---------|--------|-------------|
-| `paymentGateway.ts` | ✅ Ready | Unified abstraction for Stripe |
-| `stripeService.ts` | ✅ Ready | Card payments, Payment intents |
+| `paymentGateway.ts` | ✅ Ready | Unified abstraction for Mobile Money & Bank Transfer |
 | `mobileMoneyService.ts` | ✅ Ready | MTN MoMo, Telecel Cash, AirtelTigo Money |
 | `billPaymentService.ts` | ✅ Ready | Electricity, Water, Internet, TV bills |
 | `exchangeRateService.ts` | ✅ Ready | Dynamic forex rates, fee calculations |
@@ -19,7 +18,7 @@ This document summarizes the current state of the mobile app's payment integrati
 ### Screens Using Real APIs
 | Screen | Status | API Integration |
 |--------|--------|-----------------|
-| `DepositScreen` | ✅ Real | paymentGateway (Mobile Money, Card, Bank) |
+| `DepositScreen` | ✅ Real | paymentGateway (Mobile Money, Bank Transfer) |
 | `SendMoneyScreen` | ✅ Real | paymentService.sendMoney() |
 | `RemittanceScreen` | ✅ Real | exchangeRateService, paymentService.sendRemittance() |
 | `RemittanceConfirmScreen` | ✅ Real | paymentService.sendRemittance() |
@@ -41,22 +40,11 @@ This document summarizes the current state of the mobile app's payment integrati
 
 ## Production Requirements
 
-### 1. API Keys Configuration
-Replace test keys with production keys in environment:
-
-```javascript
-// stripeService.ts - Line 7-8
-STRIPE_CONFIG = {
-  PUBLISHABLE_KEY: 'pk_live_xxxxx', // Get from Stripe Dashboard
-}
-```
-
-### 2. Backend API Endpoints
+### 1. Backend API Endpoints
 The app calls these endpoints - ensure backend implements them:
 
 ```
 POST /api/payments/wallet/deposit/mobile-money/
-POST /api/payments/wallet/deposit/card/
 POST /api/payments/wallet/deposit/bank-transfer/
 POST /api/payments/send/
 POST /api/payments/payments/remittance/
@@ -67,7 +55,7 @@ GET  /api/payments/exchange-rates/
 GET  /api/payments/transactions/{ref}/verify/
 ```
 
-### 3. Install Dependencies
+### 2. Install Dependencies
 ```bash
 cd mobile-app
 npm install
@@ -93,11 +81,10 @@ New packages added:
 Create `.env` file:
 ```
 API_BASE_URL=https://api.sikaremit.com
-STRIPE_PUBLISHABLE_KEY=pk_live_xxxxx
 EXPO_PROJECT_ID=your-expo-project-id
 ```
 
-## 🔒 Security Checklist
+## Security Checklist
 
 - [ ] Never expose secret keys in client code
 - [ ] All API calls go through authenticated backend
@@ -111,7 +98,6 @@ EXPO_PROJECT_ID=your-expo-project-id
 
 ### Payment Flow Testing
 - [ ] Mobile Money deposit (MTN, Telecel, AirtelTigo)
-- [ ] Card payment via Stripe
 - [ ] Bank transfer deposit
 - [ ] Local money transfer (P2P)
 - [ ] International remittance
@@ -128,12 +114,11 @@ EXPO_PROJECT_ID=your-expo-project-id
 
 ## 🚀 Deployment Steps
 
-1. **Update API Keys** - Replace all test keys with production keys
-2. **Backend Deployment** - Ensure backend is deployed and accessible
-3. **Install Dependencies** - Run `npm install`
-4. **Build App** - `expo build:android` / `expo build:ios`
-5. **Test on Device** - Test all payment flows on real device
-6. **Submit to Stores** - App Store / Play Store submission
+1. **Backend Deployment** - Ensure backend is deployed and accessible
+2. **Install Dependencies** - Run `npm install`
+3. **Build App** - `expo build:android` / `expo build:ios`
+4. **Test on Device** - Test all payment flows on real device
+5. **Submit to Stores** - App Store / Play Store submission
 
 ## 📊 Current Architecture
 
@@ -151,7 +136,6 @@ EXPO_PROJECT_ID=your-expo-project-id
 ├─────────────────────────────────────────────────────────┤
 │  Services Layer                                         │
 │  ├── paymentGateway (unified interface)                 │
-│  │   └── stripeService                                  │
 │  ├── mobileMoneyService                                 │
 │  ├── billPaymentService                                 │
 │  ├── exchangeRateService                                │
@@ -169,7 +153,6 @@ EXPO_PROJECT_ID=your-expo-project-id
 │                 (Django REST Framework)                 │
 ├─────────────────────────────────────────────────────────┤
 │  ├── Payment processing                                 │
-│  ├── Stripe webhooks                                     │
 │  ├── Mobile Money API integration                       │
 │  ├── Bill payment providers                             │
 │  └── KYC verification                                   │
@@ -180,9 +163,8 @@ EXPO_PROJECT_ID=your-expo-project-id
 
 **The mobile app is ready for real payments.** All screens now use real API calls through the service layer. The only remaining steps are:
 
-1. Configure production API keys
-2. Ensure backend endpoints are implemented
-3. Run `npm install` to install dependencies
-4. Test payment flows end-to-end
+1. Ensure backend endpoints are implemented
+2. Run `npm install` to install dependencies
+3. Test payment flows end-to-end
 
 No simulated/mock code remains in the payment screens.

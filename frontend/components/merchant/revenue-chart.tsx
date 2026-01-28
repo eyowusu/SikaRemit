@@ -1,5 +1,6 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import api from '@/lib/api/axios'
@@ -8,27 +9,22 @@ export default function RevenueChart() {
   const { data: revenueData, isLoading } = useQuery({
     queryKey: ['merchant-revenue-trend'],
     queryFn: async () => {
-      try {
-        const response = await api.get('/api/v1/merchants/dashboard/sales_trend/')
-        return response.data
-      } catch (error) {
-        // Mock data for demo
-        return [
-          { date: '2024-11-01', total: 1200 },
-          { date: '2024-11-02', total: 1400 },
-          { date: '2024-11-03', total: 1100 },
-          { date: '2024-11-04', total: 1600 },
-          { date: '2024-11-05', total: 1800 },
-          { date: '2024-11-06', total: 1500 },
-          { date: '2024-11-07', total: 2000 },
-        ]
-      }
+      const response = await api.get('/api/v1/merchants/dashboard/sales_trend/')
+      return response.data
     }
   })
 
-  if (isLoading) {
+  const [isChartReady, setIsChartReady] = useState(false)
+  
+  // Set chart ready after component mounts and container is rendered
+  useEffect(() => {
+    const timer = setTimeout(() => setIsChartReady(true), 100)
+    return () => clearTimeout(timer)
+  }, [])
+
+  if (isLoading || !isChartReady) {
     return (
-      <div className="h-80 flex items-center justify-center">
+      <div className="h-80 w-full flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
       </div>
     )
@@ -40,8 +36,8 @@ export default function RevenueChart() {
   })) || []
 
   return (
-    <div className="h-80">
-      <ResponsiveContainer width="100%" height="100%">
+    <div className="h-80 w-full">
+      <ResponsiveContainer width={800} height={320}>
         <LineChart data={formattedData}>
           <CartesianGrid strokeDasharray="3 3" className="stroke-gray-200 dark:stroke-gray-700" />
           <XAxis

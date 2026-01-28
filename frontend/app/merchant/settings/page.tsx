@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -30,11 +30,12 @@ import { useToast } from '@/hooks/use-toast'
 import { PhoneInput } from 'react-international-phone'
 import 'react-international-phone/style.css'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { COUNTRIES } from '@/lib/utils/phone'
+import { COUNTRIES, loadCountriesForPhone } from '@/lib/utils/phone'
 import { CurrencySelector } from '@/components/currency/currency-selector'
 import { ExchangeRateChart } from '@/components/currency/exchange-rate-chart'
 import { useSession } from '@/lib/auth'
 import api from '@/lib/api/axios'
+import { useRouter } from 'next/navigation'
 
 interface MerchantSettings {
   businessName: string
@@ -60,11 +61,16 @@ interface MerchantSettings {
     autoPayout: boolean
     minimumPayout: number
   }
+  currencySettings: {
+    autoConvert: boolean
+  }
+  currencyRates: Record<string, number>
 }
 
 export default function MerchantSettingsPage() {
   const session = useSession()
   const [activeTab, setActiveTab] = useState('business')
+  const [countries, setCountries] = useState<any[]>([])
   const [settings, setSettings] = useState<MerchantSettings>({
     businessName: '',
     taxId: '',
@@ -88,11 +94,56 @@ export default function MerchantSettingsPage() {
       defaultMethod: 'bank_transfer',
       autoPayout: false,
       minimumPayout: 100
+    },
+    currencySettings: {
+      autoConvert: false
+    },
+    currencyRates: {
+      
     }
   })
 
   const { toast } = useToast()
   const queryClient = useQueryClient()
+  const router = useRouter()
+
+  // Load saved currency rates and settings on mount
+  useEffect(() => {
+    const savedRates = localStorage.getItem('merchant-currency-rates')
+    if (savedRates) {
+      try {
+        const rates = JSON.parse(savedRates)
+        setSettings(prev => ({
+          ...prev,
+          currencyRates: { ...prev.currencyRates, ...rates }
+        }))
+      } catch (error) {
+        console.error('Failed to load saved currency rates:', error)
+      }
+    }
+
+    const savedSettings = localStorage.getItem('merchant-currency-settings')
+    if (savedSettings) {
+      try {
+        const settingsData = JSON.parse(savedSettings)
+        setSettings(prev => ({
+          ...prev,
+          currencySettings: { ...prev.currencySettings, ...settingsData }
+        }))
+      } catch (error) {
+        console.error('Failed to load saved currency settings:', error)
+      }
+    }
+  }, [])
+
+  // Load countries for the address select
+  useEffect(() => {
+    const loadCountries = async () => {
+      await loadCountriesForPhone()
+      setCountries([...COUNTRIES])
+    }
+    loadCountries()
+  }, [])
 
   const updateSettingsMutation = useMutation({
     mutationFn: async (newSettings: MerchantSettings) => {
@@ -103,22 +154,12 @@ export default function MerchantSettingsPage() {
           tax_id: newSettings.taxId,
           email: newSettings.email,
           phone: newSettings.phone,
-          address_street: newSettings.address.street,
-          address_city: newSettings.address.city,
-          address_country: newSettings.address.country,
-          address_postal_code: newSettings.address.postalCode
+          address: newSettings.address
         })
       }
       
       // Update notification settings
-      await api.patch('/api/v1/merchants/settings/notifications/', {
-        email_enabled: newSettings.notifications.email,
-        sms_enabled: newSettings.notifications.sms,
-        sms_number: newSettings.notifications.smsNumber,
-        transaction_alerts: newSettings.notifications.transactionAlerts,
-        payout_alerts: newSettings.notifications.payoutAlerts,
-        security_alerts: newSettings.notifications.securityAlerts
-      })
+      await api.patch('/api/v1/merchants/settings/notifications/', newSettings.notifications)
       
       // Update payout settings
       await api.patch('/api/v1/merchants/settings/payouts/', {
@@ -126,6 +167,12 @@ export default function MerchantSettingsPage() {
         auto_payout: newSettings.payoutSettings.autoPayout,
         minimum_payout: newSettings.payoutSettings.minimumPayout
       })
+      
+      // Save custom currency rates to localStorage
+      localStorage.setItem('merchant-currency-rates', JSON.stringify(newSettings.currencyRates))
+      
+      // Save currency settings to localStorage
+      localStorage.setItem('merchant-currency-settings', JSON.stringify(newSettings.currencySettings))
       
       return newSettings
     },
@@ -303,14 +350,16 @@ export default function MerchantSettingsPage() {
                       <SelectValue placeholder="Select country" />
                     </SelectTrigger>
                     <SelectContent className="max-h-60">
-                      {COUNTRIES.map((country: any) => (
+                      {countries.length > 0 ? countries.map((country: any) => (
                         <SelectItem key={country.code} value={country.name}>
                           <span className="flex items-center gap-2">
                             <span className="text-lg leading-none" dangerouslySetInnerHTML={{ __html: country.flag }} />
                             <span>{country.name}</span>
                           </span>
                         </SelectItem>
-                      ))}
+                      )) : (
+                        <SelectItem value="loading" disabled>Loading countries...</SelectItem>
+                      )}
                     </SelectContent>
                   </Select>
                   <Input
@@ -508,7 +557,7 @@ export default function MerchantSettingsPage() {
               </div>
             </CardHeader>
             <CardContent className="relative z-10 p-6 space-y-6">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 gap-6">
                 {/* Currency Selector */}
                 <div className="space-y-4">
                   <div>
@@ -530,14 +579,6 @@ export default function MerchantSettingsPage() {
                         Refresh
                       </Button>
                     </div>
-                  </div>
-                </div>
-
-                {/* Exchange Rate Chart */}
-                <div className="space-y-4">
-                  <Label className="text-base font-semibold">Exchange Rate Trends</Label>
-                  <div className="h-64 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
-                    <ExchangeRateChart />
                   </div>
                 </div>
               </div>
@@ -566,33 +607,31 @@ export default function MerchantSettingsPage() {
                         Automatically convert foreign payments
                       </p>
                     </div>
-                    <Switch
-                      checked={true}
-                      onCheckedChange={() => {}}
-                    />
+                    <Switch checked={settings.currencySettings.autoConvert} onCheckedChange={(checked) => handleNestedChange('currencySettings', 'autoConvert', checked)} />
                   </div>
                 </div>
               </div>
 
-              {/* Currency Conversion Examples */}
+              {/* Custom Exchange Rates */}
               <div className="space-y-4">
-                <Label className="text-base font-semibold">Currency Conversion Examples</Label>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg text-center">
-                    <div className="text-2xl font-bold text-gray-900 dark:text-white">₵100 GHS</div>
-                    <div className="text-sm text-gray-600 dark:text-gray-400">≈ ₵650 GHS</div>
-                    <div className="text-xs text-green-600 mt-1">Live Rate</div>
-                  </div>
-                  <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg text-center">
-                    <div className="text-2xl font-bold text-gray-900 dark:text-white">€50 EUR</div>
-                    <div className="text-sm text-gray-600 dark:text-gray-400">≈ ₵425 GHS</div>
-                    <div className="text-xs text-green-600 mt-1">Live Rate</div>
-                  </div>
-                  <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg text-center">
-                    <div className="text-2xl font-bold text-gray-900 dark:text-white">£30 GBP</div>
-                    <div className="text-sm text-gray-600 dark:text-gray-400">≈ ₵480 GHS</div>
-                    <div className="text-xs text-green-600 mt-1">Live Rate</div>
-                  </div>
+                <Label className="text-base font-semibold">Custom Exchange Rates</Label>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                  Set custom exchange rates for currencies (relative to USD). These rates will override the live rates throughout the app.
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {Object.entries(settings.currencyRates).map(([currency, rate]) => (
+                    <div key={currency} className="flex items-center space-x-3 p-3 border border-gray-200 dark:border-gray-700 rounded-lg">
+                      <Label className="font-medium w-12">{currency}:</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={rate}
+                        onChange={(e) => handleNestedChange('currencyRates', currency, parseFloat(e.target.value) || 0)}
+                        placeholder="Enter rate"
+                        className="flex-1"
+                      />
+                    </div>
+                  ))}
                 </div>
               </div>
             </CardContent>
@@ -623,7 +662,7 @@ export default function MerchantSettingsPage() {
                   <p className="text-sm text-red-700 dark:text-red-300 mb-4">
                     For security reasons, password changes must be done through the main authentication system.
                   </p>
-                  <Button variant="outline" size="sm">
+                  <Button variant="outline" size="sm" onClick={() => router.push('/auth/change-password')}>
                     Change Password
                   </Button>
                 </div>
@@ -633,7 +672,7 @@ export default function MerchantSettingsPage() {
                   <p className="text-sm text-blue-700 dark:text-blue-300 mb-4">
                     Add an extra layer of security to your account.
                   </p>
-                  <Button variant="outline" size="sm">
+                  <Button variant="outline" size="sm" onClick={() => router.push('/settings/security/2fa')}>
                     Enable 2FA
                   </Button>
                 </div>
@@ -643,7 +682,7 @@ export default function MerchantSettingsPage() {
                   <p className="text-sm text-green-700 dark:text-green-300 mb-4">
                     Manage API keys for integrations.
                   </p>
-                  <Button variant="outline" size="sm">
+                  <Button variant="outline" size="sm" onClick={() => router.push('/settings/security/api-keys')}>
                     Manage API Keys
                   </Button>
                 </div>

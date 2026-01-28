@@ -10,6 +10,7 @@ import { NotificationBell } from '@/components/ui/notification-bell'
 import { UserMenu } from '@/components/UserMenu'
 import { MobileMenu } from '@/components/MobileMenu'
 import { TooltipProvider } from '@/components/ui/tooltip'
+import { Footer } from '@/components/Footer'
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -56,73 +57,7 @@ export default function RootLayout({
               </EnhancedErrorBoundary>
             </main>
 
-            <footer style={{ borderTop: '1px solid #e5e7eb', backgroundColor: '#f9fafb', position: 'relative', zIndex: 10 }}>
-              <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '24px 16px' }}>
-                {/* Logo */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
-                  <div style={{ width: '40px', height: '40px', background: 'linear-gradient(to right, #9333ea, #ec4899)', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-                    <img src="/logos/SikaRemit.jpeg" alt="SikaRemit" style={{ width: '32px', height: '32px', objectFit: 'cover', borderRadius: '8px' }} />
-                  </div>
-                  <div>
-                    <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#1f2937' }}>SikaRemit</div>
-                    <div style={{ fontSize: '12px', color: '#6b7280' }}>Secure Payment Solutions</div>
-                  </div>
-                </div>
-
-                {/* Description */}
-                <p style={{ fontSize: '14px', color: '#6b7280', marginBottom: '24px', maxWidth: '400px' }}>
-                  Empowering businesses worldwide with secure, fast, and reliable payment processing solutions.
-                </p>
-
-                {/* Links - 2x2 grid on mobile */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '24px', marginBottom: '24px' }}>
-                  <div>
-                    <div style={{ fontWeight: '600', fontSize: '14px', color: '#1f2937', marginBottom: '12px' }}>Product</div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '14px', color: '#6b7280' }}>
-                      <Link href="#features">Features</Link>
-                      <Link href="#pricing">Pricing</Link>
-                      <Link href="#security">Security</Link>
-                      <Link href="/api">API Docs</Link>
-                    </div>
-                  </div>
-                  <div>
-                    <div style={{ fontWeight: '600', fontSize: '14px', color: '#1f2937', marginBottom: '12px' }}>Support</div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '14px', color: '#6b7280' }}>
-                      <Link href="/faq">FAQ</Link>
-                      <Link href="/contact">Contact</Link>
-                      <Link href="/help">Help Center</Link>
-                      <Link href="/status">Status</Link>
-                    </div>
-                  </div>
-                  <div>
-                    <div style={{ fontWeight: '600', fontSize: '14px', color: '#1f2937', marginBottom: '12px' }}>Company</div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '14px', color: '#6b7280' }}>
-                      <Link href="/about">About</Link>
-                      <Link href="/careers">Careers</Link>
-                      <Link href="/blog">Blog</Link>
-                      <Link href="/press">Press</Link>
-                    </div>
-                  </div>
-                  <div>
-                    <div style={{ fontWeight: '600', fontSize: '14px', color: '#1f2937', marginBottom: '12px' }}>Legal</div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '14px', color: '#6b7280' }}>
-                      <Link href="/privacy">Privacy</Link>
-                      <Link href="/terms">Terms</Link>
-                      <Link href="/compliance">Compliance</Link>
-                      <Link href="/cookies">Cookies</Link>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Divider */}
-                <div style={{ height: '1px', backgroundColor: '#e5e7eb', marginBottom: '16px' }}></div>
-
-                {/* Copyright */}
-                <div style={{ textAlign: 'center', fontSize: '12px', color: '#6b7280' }}>
-                  © 2025 SikaRemit. All rights reserved. Powered by PayGlobe
-                </div>
-              </div>
-            </footer>
+            <Footer />
           </Providers>
         </TooltipProvider>
       </body>

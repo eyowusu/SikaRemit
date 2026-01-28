@@ -1,51 +1,32 @@
 /**
  * Unified Payment Gateway Abstraction Layer
  * 
- * This service provides a unified interface for payment providers
- * (Stripe). Switch providers by changing activeProvider.
+ * This service provides a unified interface for payment methods
+ * (Mobile Money, Bank Transfer). Card payments have been removed.
  */
 
-import stripeService, { 
-  StripePaymentIntentResponse,
-  StripePaymentMethod,
-  generateStripeReference 
-} from './stripeService';
 import api from './api';
 import { ENDPOINTS } from '../constants/api';
 
-// Payment Provider Types
-export type PaymentProvider = 'stripe';
-
-// Active provider - Change this to switch payment gateways
-// Options: 'stripe'
-let activeProvider: PaymentProvider = 'stripe';
-
-export const getActiveProvider = (): PaymentProvider => activeProvider;
-export const setActiveProvider = (provider: PaymentProvider): void => {
-  activeProvider = provider;
-};
+// Payment Method Types
+export type PaymentMethod = 'mobile_money' | 'bank_transfer';
 
 // Mobile Money Provider mapping
-export type MobileMoneyProvider = 'mtn' | 'vodafone' | 'airteltigo';
-
-// Note: Mobile money payments are handled by direct integrations
-// Stripe does not support mobile money in Ghana
+export type MobileMoneyProvider = 'mtn' | 'vodafone' | 'airteltigo' | 'telecel';
 
 // Unified Response Types
 export interface PaymentInitResponse {
   success: boolean;
-  provider: PaymentProvider;
+  method: PaymentMethod;
   reference: string;
   authorizationUrl?: string;
-  clientSecret?: string; // For Stripe
-  accessCode?: string; // Deprecated - no longer used
   message: string;
   data?: any;
 }
 
 export interface PaymentVerifyResponse {
   success: boolean;
-  provider: PaymentProvider;
+  method: PaymentMethod;
   reference: string;
   status: 'success' | 'failed' | 'pending' | 'abandoned';
   amount: number;
@@ -62,23 +43,9 @@ export interface PaymentVerifyResponse {
   data?: any;
 }
 
-export interface SavedCard {
-  id: string;
-  provider: PaymentProvider;
-  last4: string;
-  brand: string;
-  expMonth: string;
-  expYear: string;
-  bank?: string;
-  reusable: boolean;
-  authorizationCode?: string; // Deprecated - no longer used
-  token?: string; // Deprecated - no longer used
-  paymentMethodId?: string; // Stripe
-}
-
 export interface MobileMoneyInitResponse {
   success: boolean;
-  provider: PaymentProvider;
+  method: PaymentMethod;
   reference: string;
   status: 'pending' | 'otp_required' | 'success';
   message: string;
@@ -90,61 +57,10 @@ export interface MobileMoneyInitResponse {
 // Unified Payment Gateway Service
 const paymentGateway = {
   /**
-   * Get the currently active payment provider
-   */
-  getActiveProvider: (): PaymentProvider => activeProvider,
-
-  /**
    * Generate a unique payment reference
    */
   generateReference: (): string => {
-    switch (activeProvider) {
-      case 'stripe':
-        return generateStripeReference();
-      default:
-        return `SIKA_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
-    }
-  },
-
-  /**
-   * Initialize a card payment
-   */
-  initializeCardPayment: async (
-    email: string,
-    amount: number,
-    metadata?: Record<string, any>
-  ): Promise<PaymentInitResponse> => {
-    const reference = paymentGateway.generateReference();
-
-    try {
-      switch (activeProvider) {
-        case 'stripe': {
-          const response = await stripeService.createPaymentIntent({
-            amount,
-            customer_email: email,
-            metadata: { ...metadata, reference },
-          });
-          return {
-            success: true,
-            provider: 'stripe',
-            reference,
-            clientSecret: response.client_secret,
-            message: 'Payment intent created',
-            data: response,
-          };
-        }
-
-        default:
-          throw new Error(`Unsupported payment provider: ${activeProvider}`);
-      }
-    } catch (error: any) {
-      return {
-        success: false,
-        provider: activeProvider,
-        reference,
-        message: error.response?.data?.message || error.message || 'Payment initialization failed',
-      };
-    }
+    return `SIKA_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
   },
 
   /**
@@ -160,13 +76,27 @@ const paymentGateway = {
     const reference = paymentGateway.generateReference();
 
     try {
-      // Mobile money payments are handled by direct integrations
-      // Stripe does not support mobile money in Ghana
-      throw new Error('Mobile money payments are handled by direct integrations. Please use MTN, AirtelTigo, or Telecel services directly.');
+      const response = await api.post(ENDPOINTS.WALLET.DEPOSIT_MOBILE_MONEY, {
+        email,
+        amount,
+        phone_number: phoneNumber,
+        provider,
+        reference,
+        metadata,
+      });
+
+      return {
+        success: true,
+        method: 'mobile_money',
+        reference,
+        status: response.data.status || 'pending',
+        message: response.data.message || 'Mobile money payment initiated',
+        data: response.data,
+      };
     } catch (error: any) {
       return {
         success: false,
-        provider: activeProvider,
+        method: 'mobile_money',
         reference,
         status: 'pending',
         message: error.response?.data?.message || error.message || 'Mobile money payment failed',
@@ -183,7 +113,7 @@ const paymentGateway = {
     metadata?: Record<string, any>
   ): Promise<{
     success: boolean;
-    provider: PaymentProvider;
+    method: PaymentMethod;
     reference: string;
     bankDetails?: {
       bankName: string;
@@ -197,13 +127,24 @@ const paymentGateway = {
     const reference = paymentGateway.generateReference();
 
     try {
-      // Bank transfers are handled by direct integration
-      // Stripe bank transfers work differently and are not available in this region
-      throw new Error('Bank transfer is handled by direct integration. Please use the bank transfer service directly.');
+      const response = await api.post(ENDPOINTS.WALLET.DEPOSIT_BANK_TRANSFER, {
+        email,
+        amount,
+        reference,
+        metadata,
+      });
+
+      return {
+        success: true,
+        method: 'bank_transfer',
+        reference,
+        bankDetails: response.data.bank_details,
+        message: response.data.message || 'Bank transfer details generated',
+      };
     } catch (error: any) {
       return {
         success: false,
-        provider: activeProvider,
+        method: 'bank_transfer',
         reference,
         message: error.response?.data?.message || error.message || 'Bank transfer initialization failed',
       };
@@ -215,31 +156,25 @@ const paymentGateway = {
    */
   verifyPayment: async (reference: string): Promise<PaymentVerifyResponse> => {
     try {
-      switch (activeProvider) {
-        case 'stripe': {
-          const response = await stripeService.retrievePaymentIntent(reference);
-          return {
-            success: response.status === 'succeeded',
-            provider: 'stripe',
-            reference: response.id,
-            status: response.status === 'succeeded' ? 'success' : 
-                   response.status === 'canceled' ? 'abandoned' : 'pending',
-            amount: response.amount / 100,
-            currency: response.currency,
-            channel: 'card',
-            message: `Payment ${response.status}`,
-            data: response,
-            customer: { email: '' },
-          };
-        }
+      const response = await api.get(`${ENDPOINTS.PAYMENTS.TRANSACTIONS}/${reference}/verify/`);
 
-        default:
-          throw new Error(`Unsupported payment provider: ${activeProvider}`);
-      }
+      return {
+        success: response.data.status === 'success',
+        method: response.data.method || 'mobile_money',
+        reference: response.data.reference,
+        status: response.data.status,
+        amount: response.data.amount,
+        currency: response.data.currency || 'GHS',
+        channel: response.data.channel || 'mobile',
+        paidAt: response.data.paid_at,
+        customer: response.data.customer || { email: '' },
+        message: response.data.message || `Payment ${response.data.status}`,
+        data: response.data,
+      };
     } catch (error: any) {
       return {
         success: false,
-        provider: activeProvider,
+        method: 'mobile_money',
         reference,
         status: 'failed',
         amount: 0,
@@ -252,124 +187,78 @@ const paymentGateway = {
   },
 
   /**
-   * Get saved cards for the user
+   * Note: Card payments have been removed from the system
    */
-  getSavedCards: async (): Promise<SavedCard[]> => {
-    try {
-      switch (activeProvider) {
-        case 'stripe': {
-          const methods = await stripeService.getPaymentMethods();
-          return methods.map(method => ({
-            id: method.id,
-            provider: 'stripe',
-            last4: method.card?.last4 || '',
-            brand: method.card?.brand || '',
-            expMonth: String(method.card?.exp_month || ''),
-            expYear: String(method.card?.exp_year || ''),
-            reusable: true,
-            paymentMethodId: method.id,
-          }));
-        }
-
-        default:
-          return [];
-      }
-    } catch (error) {
-      console.error('Failed to get saved cards:', error);
-      return [];
-    }
+  initializeCardPayment: async (
+    email: string,
+    amount: number,
+    metadata?: Record<string, any>
+  ): Promise<PaymentInitResponse> => {
+    throw new Error('Card payments are no longer supported. Please use mobile money or bank transfer.');
   },
 
   /**
-   * Charge a saved card
+   * Note: Saved cards functionality has been removed
+   */
+  getSavedCards: async (): Promise<[]> => {
+    return [];
+  },
+
+  /**
+   * Note: Card charging has been removed
    */
   chargeSavedCard: async (
-    card: SavedCard,
+    card: any,
     email: string,
     amount: number,
     metadata?: Record<string, any>
   ): Promise<PaymentVerifyResponse> => {
-    try {
-      switch (card.provider) {
-        case 'stripe': {
-          if (!card.paymentMethodId) throw new Error('Missing payment method ID');
-          const response = await stripeService.chargeCard(
-            amount,
-            card.paymentMethodId,
-            'SikaRemit Deposit',
-            metadata as Record<string, string>
-          );
-          return {
-            success: response.status === 'succeeded',
-            provider: 'stripe',
-            reference: response.id,
-            status: response.status === 'succeeded' ? 'success' : 'failed',
-            amount: response.amount / 100,
-            currency: response.currency,
-            channel: 'card',
-            customer: { email },
-            message: `Payment ${response.status}`,
-            data: response,
-          };
-        }
-
-        default:
-          throw new Error(`Unsupported provider: ${card.provider}`);
-      }
-    } catch (error: any) {
-      return {
-        success: false,
-        provider: card.provider,
-        reference: '',
-        status: 'failed',
-        amount: 0,
-        currency: 'GHS',
-        channel: 'card',
-        customer: { email },
-        message: error.response?.data?.message || error.message || 'Card charge failed',
-      };
-    }
+    throw new Error('Card payments are no longer supported. Please use mobile money or bank transfer.');
   },
 
   /**
-   * Delete a saved card
+   * Note: Card deletion has been removed
    */
-  deleteSavedCard: async (card: SavedCard): Promise<boolean> => {
-    try {
-      switch (card.provider) {
-        case 'stripe':
-          if (card.paymentMethodId) {
-            await stripeService.deletePaymentMethod(card.paymentMethodId);
-          }
-          break;
-      }
-      return true;
-    } catch (error) {
-      console.error('Failed to delete saved card:', error);
-      return false;
-    }
+  deleteSavedCard: async (card: any): Promise<boolean> => {
+    throw new Error('Card payments are no longer supported.');
   },
 
   /**
-   * Note: Mobile money OTP validation was handled by Flutterwave
-   * This method is deprecated as Flutterwave has been removed
+   * Note: Mobile money OTP validation is handled by direct integrations
    */
   validateMobileMoneyOTP: async (
     reference: string,
     otp: string
   ): Promise<PaymentVerifyResponse> => {
-    throw new Error('Mobile money OTP validation is no longer available. Please use direct mobile money integrations.');
-  },
+    try {
+      const response = await api.post(`${ENDPOINTS.PAYMENTS.TRANSACTIONS}/${reference}/validate/`, {
+        otp,
+      });
 
-  /**
-   * Get public key for client-side SDK initialization
-   */
-  getPublicKey: async (): Promise<string> => {
-    switch (activeProvider) {
-      case 'stripe':
-        return stripeService.getPublishableKey();
-      default:
-        throw new Error('Unknown provider');
+      return {
+        success: response.data.status === 'success',
+        method: 'mobile_money',
+        reference: response.data.reference,
+        status: response.data.status,
+        amount: response.data.amount,
+        currency: response.data.currency || 'GHS',
+        channel: 'mobile',
+        customer: response.data.customer || { email: '' },
+        message: response.data.message || 'OTP validated',
+        data: response.data,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        method: 'mobile_money',
+        reference,
+        status: 'failed',
+        amount: 0,
+        currency: 'GHS',
+        channel: 'mobile',
+        customer: { email: '' },
+        message: error.response?.data?.message || error.message || 'OTP validation failed',
+      };
     }
   },
 };

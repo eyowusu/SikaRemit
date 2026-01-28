@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Plus, Monitor, Smartphone, Store, Settings, Power, PowerOff } from 'lucide-react'
 import { toast } from 'sonner'
+import api from '@/lib/api/axios'
 
 interface DeviceManagementProps {
   devices: any[];
@@ -43,46 +44,26 @@ const DeviceManagement = ({ devices, onDeviceUpdate }: DeviceManagementProps) =>
 
   const handleRegisterDevice = async () => {
     try {
-      const response = await fetch('/api/v1/payments/pos/register-device/', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('access_token')}`
-        },
-        body: JSON.stringify(registerForm)
-      })
-
-      if (response.ok) {
-        toast.success('Device registered successfully')
-        setIsRegisterDialogOpen(false)
-        setRegisterForm({ device_type: '', device_name: '', device_info: {} })
-        onDeviceUpdate(null)
-      } else {
-        const error = await response.json()
-        toast.error(error.error || 'Failed to register device')
-      }
-    } catch (error) {
-      toast.error('Network error occurred')
+      const response = await api.post('/api/v1/payments/pos/register-device/', registerForm)
+      
+      toast.success('Device registered successfully')
+      setIsRegisterDialogOpen(false)
+      setRegisterForm({ device_type: '', device_name: '', device_info: {} })
+      onDeviceUpdate(null)
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.error || 'Failed to register device'
+      toast.error(errorMessage)
     }
   }
 
   const handleDeviceAction = async (deviceId: string, action: string) => {
     try {
-      const response = await fetch(`/api/v1/payments/pos/devices/${deviceId}/${action}/`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('access_token')}`
-        }
-      })
-
-      if (response.ok) {
-        toast.success(`Device ${action}d successfully`)
-        onDeviceUpdate(null)
-      } else {
-        toast.error(`Failed to ${action} device`)
-      }
+      const response = await api.post(`/api/v1/payments/pos/devices/${deviceId}/${action}/`)
+      
+      toast.success(`Device ${action}d successfully`)
+      onDeviceUpdate(null)
     } catch (error) {
-      toast.error('Network error occurred')
+      toast.error(`Failed to ${action} device`)
     }
   }
 

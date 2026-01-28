@@ -11,15 +11,33 @@ import { Badge } from '@/components/ui/badge'
 import { useToast } from '@/hooks/use-toast'
 import { useCurrency } from '@/hooks/useCurrency'
 import { getCurrencies, updateCurrencyPreferences, getCurrencyPreferences } from '@/lib/api/currency'
-import { Currency } from '@/lib/types/currency'
-import { CurrencyService } from '@/lib/services/currency-service'
 import { Globe, Settings, DollarSign } from 'lucide-react'
+
+interface Currency {
+  code: string
+  name: string
+  symbol: string
+  flag_emoji: string
+  is_active: boolean
+  is_base_currency: boolean
+  fee_percentage: number
+  created_at: string
+  updated_at: string
+}
 
 interface CurrencySelectorProps {
   onCurrencyChange?: (currency: Currency) => void
   showPreferences?: boolean
   compact?: boolean
 }
+
+// Fallback currencies if API fails
+const FALLBACK_CURRENCIES: Currency[] = [
+  { code: 'GHS', name: 'Ghanaian Cedi', symbol: '₵', flag_emoji: '🇬🇭', is_active: true, is_base_currency: true, fee_percentage: 0, created_at: '', updated_at: '' },
+  { code: 'USD', name: 'US Dollar', symbol: '$', flag_emoji: '🇺🇸', is_active: true, is_base_currency: false, fee_percentage: 0, created_at: '', updated_at: '' },
+  { code: 'EUR', name: 'Euro', symbol: '€', flag_emoji: '🇪🇺', is_active: true, is_base_currency: false, fee_percentage: 0, created_at: '', updated_at: '' },
+  { code: 'GBP', name: 'British Pound', symbol: '£', flag_emoji: '🇬🇧', is_active: true, is_base_currency: false, fee_percentage: 0, created_at: '', updated_at: '' }
+]
 
 export function CurrencySelector({ onCurrencyChange, showPreferences = true, compact = false }: CurrencySelectorProps) {
   const [currencies, setCurrencies] = useState<Currency[]>([])
@@ -30,8 +48,13 @@ export function CurrencySelector({ onCurrencyChange, showPreferences = true, com
   const { setCurrency } = useCurrency()
   const [isLoading, setIsLoading] = useState(true)
 
-  // Use only currencies from API - no hardcoded defaults
-  const allCurrencies = currencies.map(c => ({
+  // Use only currencies from API - fallback to static if API fails
+  const allCurrencies = currencies.length > 0 ? currencies.map(c => ({
+    ...c,
+    fee_percentage: 0,
+    created_at: c.created_at || new Date().toISOString(),
+    updated_at: c.updated_at || new Date().toISOString(),
+  })) : FALLBACK_CURRENCIES.map(c => ({
     ...c,
     fee_percentage: 0,
     created_at: c.created_at || new Date().toISOString(),
@@ -47,9 +70,13 @@ export function CurrencySelector({ onCurrencyChange, showPreferences = true, com
 
   const loadCurrencies = async () => {
     setIsLoading(true)
+    // Use fallback currencies directly since API is not implemented
+    setCurrencies([])
+    setIsLoading(false)
+    /*
     try {
       const response = await getCurrencies()
-      setCurrencies(response?.data || [])
+      setCurrencies(response || [])
     } catch (error) {
       console.error('Failed to load currencies:', error)
       toast({
@@ -60,6 +87,7 @@ export function CurrencySelector({ onCurrencyChange, showPreferences = true, com
     } finally {
       setIsLoading(false)
     }
+    */
   }
 
   const loadPreferences = async () => {
@@ -182,12 +210,8 @@ export function CurrencySelector({ onCurrencyChange, showPreferences = true, com
             {selectedCurrency && (
               <div className="p-3 bg-gray-50 rounded-lg">
                 <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">Sample Amount:</span>
-                  <span className="font-semibold">
-                    {selectedCurrency && allCurrencies.find(c => c.code === selectedCurrency)
-                      ? CurrencyService.formatAmount(1234.56, allCurrencies.find(c => c.code === selectedCurrency)!)
-                      : '₵1,234.56'}
-                  </span>
+                  <span className="text-sm text-gray-600">Selected Currency:</span>
+                  <span className="font-semibold">{selectedCurrency}</span>
                 </div>
               </div>
             )}

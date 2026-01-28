@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Calendar, Search, Filter, Download, Receipt } from 'lucide-react'
 import { toast } from 'sonner'
+import api from '@/lib/api/axios'
 
 interface Transaction {
   id: string;
@@ -54,26 +55,17 @@ const TransactionHistory = () => {
         )
       })
 
-      const response = await fetch(`/api/v1/payments/pos/transactions/?${queryParams}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('access_token')}`
-        }
+      const response = await api.get(`/api/v1/payments/pos/transactions/?${queryParams}`)
+      
+      setTransactions(response.data.results || [])
+      setPagination({
+        page: pagination.page,
+        total: response.data.count || 0,
+        hasNext: !!response.data.next,
+        hasPrev: !!response.data.previous
       })
-
-      if (response.ok) {
-        const data = await response.json()
-        setTransactions(data.results || [])
-        setPagination({
-          page: pagination.page,
-          total: data.count || 0,
-          hasNext: !!data.next,
-          hasPrev: !!data.previous
-        })
-      } else {
-        toast.error('Failed to fetch transactions')
-      }
     } catch (error) {
-      toast.error('Network error occurred')
+      toast.error('Failed to fetch transactions')
     } finally {
       setLoading(false)
     }
@@ -86,28 +78,16 @@ const TransactionHistory = () => {
 
   const handleGenerateReceipt = async (transactionId: string) => {
     try {
-      const response = await fetch('/api/v1/payments/pos/generate-receipt/', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('access_token')}`
-        },
-        body: JSON.stringify({
-          transaction_id: transactionId,
-          receipt_type: 'merchant'
-        })
+      const response = await api.post('/api/v1/payments/pos/generate-receipt/', {
+        transaction_id: transactionId,
+        receipt_type: 'merchant'
       })
 
-      if (response.ok) {
-        const data = await response.json()
-        // In a real app, this would trigger a print dialog or download
-        toast.success('Receipt generated successfully')
-        console.log('Receipt:', data.receipt_text)
-      } else {
-        toast.error('Failed to generate receipt')
-      }
+      // In a real app, this would trigger a print dialog or download
+      toast.success('Receipt generated successfully')
+      console.log('Receipt:', response.data.receipt_text)
     } catch (error) {
-      toast.error('Network error occurred')
+      toast.error('Failed to generate receipt')
     }
   }
 

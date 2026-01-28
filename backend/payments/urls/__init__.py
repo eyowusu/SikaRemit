@@ -1,6 +1,8 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from ..views import PaymentMethodViewSet, TransactionViewSet, AdminTransactionViewSet, process_payment, verify_mobile_payment, USSDCallbackView, USSDTransactionViewSet, PaymentViewSet, ScheduledPayoutViewSet, CrossBorderRemittanceViewSet, VerificationViewSet, P2PPaymentView, validate_qr_payment, process_qr_payment, send_remittance_view, initiate_payment_view, process_checkout_view, send_outbound_remittance_view, send_global_remittance_view, DomesticTransferViewSet
+from ..views.analytics_views import AnalyticsViewSet
+from ..views.dispute_views import DisputeViewSet
 from ..views.subscriptions_views import SubscriptionViewSet
 from ..views.rate_limiting_views import RateLimitingViewSet, RateLimitMonitoringViewSet
 from ..views.telecom_views import telecom_providers, telecom_packages, purchase_airtime, purchase_data_bundle
@@ -58,6 +60,8 @@ router.register(r'fees', FeeConfigurationViewSet, basename='fees')
 router.register(r'bills', BillViewSet, basename='bills')
 router.register(r'subscriptions', SubscriptionViewSet, basename='subscriptions')
 router.register(r'domestic-transfers', DomesticTransferViewSet, basename='domestic-transfers')
+router.register(r'analytics', AnalyticsViewSet, basename='analytics')
+router.register(r'admin/disputes', DisputeViewSet, basename='admin-disputes')
 
 
 urlpatterns = [
@@ -160,6 +164,10 @@ urlpatterns = [
     path('outbound-remittance/', send_outbound_remittance_view, name='outbound-remittance'),
     path('global-remittance/', send_global_remittance_view, name='global-remittance'),
     path('analytics/methods/', PaymentMethodViewSet.as_view({'get': 'analytics'}), name='payment-method-analytics'),
+    path('analytics/realtime_metrics/', AnalyticsViewSet.as_view({'get': 'realtime_metrics'}), name='analytics-realtime-metrics'),
+    path('analytics/dashboard_snapshot/', AnalyticsViewSet.as_view({'get': 'dashboard_overview'}), name='analytics-dashboard-snapshot'),
+    path('analytics/overview/', AnalyticsViewSet.as_view({'get': 'dashboard_overview'}), name='analytics-overview'),
+    path('alerts/', AnalyticsViewSet.as_view({'get': 'risk_analytics'}), name='payment-alerts'),
     path('verify/', TransactionViewSet.as_view({'post': 'verify_payment'}), name='verify-payment'),
     path('refund/', TransactionViewSet.as_view({'post': 'request_refund'}), name='request-refund'),
     path('data-plans/', telecom_packages, name='data-plans'),

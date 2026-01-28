@@ -10,6 +10,7 @@ from .views import (
     AdminUserCreateView, AdminUserViewSet, SupportTicketViewSet, PayoutViewSet, UserSearchView
 )
 from .api.views import RecipientViewSet
+from .api.views_customer import CreateCustomerAPIView
 
 # Create router for support tickets
 support_router = DefaultRouter()
@@ -53,4 +54,5 @@ urlpatterns = [
         'patch': 'partial_update',
         'delete': 'destroy'
     }), name='admin_users_detail'),
+    path('admin/create-customer/', CreateCustomerAPIView.as_view(), name='create_customer'),
 ]

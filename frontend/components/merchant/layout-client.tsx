@@ -67,21 +67,22 @@ export default function MerchantLayoutClient({ children }: MerchantLayoutClientP
       {/* Mobile sidebar overlay */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 z-30 bg-background/80 backdrop-blur-sm transition-all duration-300 lg:hidden"
+          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
           onClick={() => setSidebarOpen(false)}
         />
       )}
 
       <MerchantSidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
-      <div className={`transition-all duration-300 ease-in-out ${sidebarOpen ? 'lg:pl-64' : ''}`}>
-        <MerchantHeader 
-          onMenuClick={() => setSidebarOpen(!sidebarOpen)} 
-          sidebarOpen={sidebarOpen} 
-        />
+      <MerchantHeader 
+        onMenuClick={() => setSidebarOpen(!sidebarOpen)} 
+        sidebarOpen={sidebarOpen} 
+      />
 
-        <main className="min-h-[calc(100vh-4rem)]">
-          <div className="revolut-container py-6 lg:py-8">
+      <div className="lg:pl-64">
+
+        <main className="min-h-[calc(100vh-3.5rem)] sm:min-h-[calc(100vh-4rem)]">
+          <div className="px-3 py-4 sm:px-4 sm:py-6 md:px-6 lg:px-8">
             {children}
           </div>
         </main>

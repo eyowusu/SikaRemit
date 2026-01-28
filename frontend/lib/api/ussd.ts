@@ -2,6 +2,16 @@ import axios from 'axios'
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
+// Track if we've already warned about missing USSD endpoints
+const warnedEndpoints = new Set<string>()
+
+function warnOnce(endpoint: string, message: string) {
+  if (!warnedEndpoints.has(endpoint)) {
+    warnedEndpoints.add(endpoint)
+    console.warn(message)
+  }
+}
+
 function getAuthHeaders() {
   const token = localStorage.getItem('access_token')
   return {
@@ -65,26 +75,60 @@ export interface USSDStats {
 }
 
 export async function getUSSDTransactions(params?: any): Promise<USSDTransaction[]> {
-  const response = await axios.get(`${API_BASE_URL}/api/v1/admin/ussd/transactions/`, {
-    headers: getAuthHeaders(),
-    params
-  })
-  return response.data.results || response.data
+  try {
+    const response = await axios.get(`${API_BASE_URL}/api/v1/admin/ussd/transactions/`, {
+      headers: getAuthHeaders(),
+      params
+    })
+    return response.data.results || response.data || []
+  } catch (error: any) {
+    if (error?.response?.status === 404) {
+      warnOnce('transactions', 'USSD transactions endpoint not available')
+      return []
+    }
+    throw error
+  }
 }
 
 export async function getUSSDSessions(params?: any): Promise<USSDSession[]> {
-  const response = await axios.get(`${API_BASE_URL}/api/v1/admin/ussd/sessions/`, {
-    headers: getAuthHeaders(),
-    params
-  })
-  return response.data.results || response.data
+  try {
+    const response = await axios.get(`${API_BASE_URL}/api/v1/admin/ussd/sessions/`, {
+      headers: getAuthHeaders(),
+      params
+    })
+    return response.data.results || response.data || []
+  } catch (error: any) {
+    if (error?.response?.status === 404) {
+      warnOnce('sessions', 'USSD sessions endpoint not available')
+      return []
+    }
+    throw error
+  }
 }
 
 export async function getUSSDStats(): Promise<USSDStats> {
-  const response = await axios.get(`${API_BASE_URL}/api/v1/admin/ussd/stats/`, {
-    headers: getAuthHeaders()
-  })
-  return response.data
+  try {
+    const response = await axios.get(`${API_BASE_URL}/api/v1/admin/ussd/stats/`, {
+      headers: getAuthHeaders()
+    })
+    return response.data
+  } catch (error: any) {
+    if (error?.response?.status === 404) {
+      warnOnce('stats', 'USSD stats endpoint not available')
+      return {
+        total_sessions: 0,
+        active_sessions: 0,
+        completed_sessions: 0,
+        timeout_sessions: 0,
+        completed_transactions: 0,
+        total_amount: 0,
+        success_rate: 0,
+        average_duration: 0,
+        by_service: []
+      }
+    }
+    throw error
+  }
 }
 
 export async function simulateUSSD(data: { phone_number: string; service_code: string; input?: string }) {
